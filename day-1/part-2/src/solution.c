@@ -30,10 +30,10 @@ int get_window_sized_depth_measurement_increases(int* measurements, int numberOf
     return numberOfIncreases;
 }
 
-int solution(FILE* fp, int numberOfLines, int windowSize) {
+int solution(FILE* input, int numberOfLines, int windowSize) {
     int* measurements = calloc(numberOfLines, sizeof(int));
     int i = 0;
-    while (fscanf(fp, "%d", &measurements[i]) != EOF) {
+    while (fscanf(input, "%d", &measurements[i]) != EOF) {
         i++;
     }
     int numberOfIncreases = get_window_sized_depth_measurement_increases(measurements, numberOfLines, windowSize);
@@ -42,14 +42,14 @@ int solution(FILE* fp, int numberOfLines, int windowSize) {
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt 2000 3"*/) {
-    FILE* measurements = fopen(argv[1], "r");
-    if(measurements == NULL) {
+    FILE* input = fopen(argv[1], "r");
+    if(input == NULL) {
         perror("Failed");
         return -1;
     } else {
-        int answer = solution(measurements, atoi(argv[2]), atoi(argv[3]));
+        int answer = solution(input, atoi(argv[2]), atoi(argv[3]));
         printf("Answer: %d\n", answer);
     }
-    fclose(measurements);
+    fclose(input);
     return 0;
 }
