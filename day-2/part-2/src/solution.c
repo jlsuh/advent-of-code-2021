@@ -17,13 +17,13 @@ bool is_down(char* command) {
     return strcmp(command, "down") == 0;
 }
 
-int solution(FILE* fp) {
+int solution(FILE* input) {
     char* command = calloc(MAX_COMMAND_LEN, sizeof(char));
     int value = 0;
     int xAxis = 0;
     int yAxis = 0;
     int aim = 0;
-    while(fscanf(fp, "%s %d", command, &value) != EOF) {
+    while(fscanf(input, "%s %d", command, &value) != EOF) {
         if(is_forward(command)) {
             xAxis += value;
             yAxis += aim * value;
@@ -38,14 +38,14 @@ int solution(FILE* fp) {
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt 1000"*/) {
-    FILE* measurements = fopen(argv[1], "r");
-    if(measurements == NULL) {
+    FILE* input = fopen(argv[1], "r");
+    if(input == NULL) {
         perror("Failed");
         return -1;
     } else {
-        int answer = solution(measurements);
+        int answer = solution(input);
         printf("Answer: %d\n", answer);
     }
-    fclose(measurements);
+    fclose(input);
     return 0;
 }
