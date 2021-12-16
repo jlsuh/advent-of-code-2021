@@ -16,14 +16,14 @@ int binary_to_dec(char* binaryNumber) {
     return decimal;
 }
 
-int solution(FILE* fp, int numberOfEntries, int maxBinaryLen) {
+int solution(FILE* input, int numberOfEntries, int maxBinaryLen) {
     char* binaryNumber = calloc(maxBinaryLen, sizeof(char));
     char* gammaRate = calloc(maxBinaryLen, sizeof(char));
     char* epsilonRate = calloc(maxBinaryLen, sizeof(char));
     for(int i = 0; i < maxBinaryLen - 1; i++) {
         int zeros = 0;
         int ones = 0;
-        while(fscanf(fp, "%s", binaryNumber) != EOF) {
+        while(fscanf(input, "%s", binaryNumber) != EOF) {
             if(binaryNumber[i] == ZERO) {
                 zeros++;
             } else {
@@ -37,7 +37,7 @@ int solution(FILE* fp, int numberOfEntries, int maxBinaryLen) {
             gammaRate[i] = ONE;
             epsilonRate[i] = ZERO;
         }
-        rewind(fp);
+        rewind(input);
     }
     int gammaValue = binary_to_dec(gammaRate);
     int epsilonValue = binary_to_dec(epsilonRate);
@@ -48,14 +48,14 @@ int solution(FILE* fp, int numberOfEntries, int maxBinaryLen) {
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt 1000 13"*/) {
-    FILE* measurements = fopen(argv[1], "r");
-    if(measurements == NULL) {
+    FILE* input = fopen(argv[1], "r");
+    if(input == NULL) {
         perror("Failed");
         return -1;
     } else {
-        int answer = solution(measurements, atoi(argv[2]), atoi(argv[3]));
+        int answer = solution(input, atoi(argv[2]), atoi(argv[3]));
         printf("Answer: %d\n", answer);
     }
-    fclose(measurements);
+    fclose(input);
     return 0;
 }

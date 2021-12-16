@@ -42,14 +42,14 @@ void set_bit_criteria(t_bit_criteria criteria, char* wantedBit, int* nextNumberO
     }
 }
 
-int get_rating(FILE* fp, int numberOfEntries, int maxBinaryLen, t_bit_criteria criteria) {
+int get_rating(FILE* input, int numberOfEntries, int maxBinaryLen, t_bit_criteria criteria) {
     int currNumberOfEntries = numberOfEntries;
     char* binaryNumber = calloc(maxBinaryLen, sizeof(char));
     char** numbers = calloc(currNumberOfEntries, sizeof(char*));
-    for(int i = 0; fscanf(fp, "%s", binaryNumber) != EOF; i++) {
+    for(int i = 0; fscanf(input, "%s", binaryNumber) != EOF; i++) {
         numbers[i] = strdup(binaryNumber);
     }
-    rewind(fp);
+    rewind(input);
 
     for(int bitIndex = 0; bitIndex < maxBinaryLen - 1; bitIndex++) {
         if(currNumberOfEntries == 1) {
@@ -100,9 +100,9 @@ int get_rating(FILE* fp, int numberOfEntries, int maxBinaryLen, t_bit_criteria c
     return rating;
 }
 
-int solution(FILE* fp, int numberOfEntries, int maxBinaryLen) {
-    int oxygenGeneratorRating = get_rating(fp, numberOfEntries, maxBinaryLen, OXYGEN_GENERATOR_RATING);
-    int CO2ScrubberRating = get_rating(fp, numberOfEntries, maxBinaryLen, CO2_SCRUBBER_RATING);
+int solution(FILE* input, int numberOfEntries, int maxBinaryLen) {
+    int oxygenGeneratorRating = get_rating(input, numberOfEntries, maxBinaryLen, OXYGEN_GENERATOR_RATING);
+    int CO2ScrubberRating = get_rating(input, numberOfEntries, maxBinaryLen, CO2_SCRUBBER_RATING);
     printf("OXYGEN GENERATOR RATING: %d | CO2 SCRUBBER RATING: %d\n", oxygenGeneratorRating, CO2ScrubberRating);
     return oxygenGeneratorRating * CO2ScrubberRating;
 }
