@@ -9,7 +9,7 @@ typedef struct {
     int drawsUntilWin;
 } t_matrix_analysis;
 
-void skip_until_next_matrix(FILE* input) {
+void skip_newlines_until_next_matrix(FILE* input) {
     char c = fgetc(input);
     while(c == '\n') {
         c = fgetc(input);
@@ -17,7 +17,7 @@ void skip_until_next_matrix(FILE* input) {
     ungetc(c, input);
 }
 
-int* extract_draw_sequence(FILE* input, int drawSequenceSize) {
+int* get_draw_sequence(FILE* input, int drawSequenceSize) {
     int* drawSequence = malloc(sizeof(int) * drawSequenceSize);
     int i = 0;
     fscanf(input, "%d", &drawSequence[i++]);
@@ -28,7 +28,7 @@ int* extract_draw_sequence(FILE* input, int drawSequenceSize) {
     return drawSequence;
 }
 
-int draw_sequence_size(FILE* input) {
+int get_draw_sequence_size(FILE* input) {
     int drawSequenceSize = 1;
     char c = '\0';
     while((c = fgetc(input)) != EOF) {
@@ -61,10 +61,9 @@ bool is_bingo(int squaredDim, bool** markGrid) {
     return false;
 }
 
-t_matrix_analysis matrix_analysis_until_win(int squaredDim, int** matrix, int* drawSequence, int drawSequenceSize) {
+t_matrix_analysis get_matrix_analysis_until_win(int squaredDim, int** matrix, int* drawSequence, int drawSequenceSize) {
     t_matrix_analysis matrixAnalysis;
 
-    bool bingo = false;
     bool** markGrid = calloc(squaredDim * squaredDim, sizeof(bool*));
     for(int i = 0; i < squaredDim; i++) {
         markGrid[i] = calloc(squaredDim, sizeof(bool));
@@ -83,8 +82,7 @@ t_matrix_analysis matrix_analysis_until_win(int squaredDim, int** matrix, int* d
         }
         drawIndex++;
         if(found) {
-            bingo = is_bingo(squaredDim, markGrid);
-            if(bingo) {
+            if(is_bingo(squaredDim, markGrid)) {
                 break;
             }
         }
@@ -124,6 +122,18 @@ bool is_octo_win(char* outcome) {
     return strcmp(outcome, "OCTOWIN") == 0;
 }
 
+int get_score(t_matrix_analysis drawsMatrix, int* drawSequence, int squaredDim) {
+    int unmarkedSum = 0;
+    for(int i = 0; i < squaredDim; i++) {
+        for(int j = 0; j < squaredDim; j++) {
+            if(!drawsMatrix.markGrid[j][i]) {
+                unmarkedSum += drawsMatrix.matrix[j][i];
+            }
+        }
+    }
+    return unmarkedSum * drawSequence[drawsMatrix.drawsUntilWin - 1];
+}
+
 int** matrix_create(int squaredDim) {
     int** self = calloc(squaredDim, sizeof(int*));
     for(int i = 0; i < squaredDim; i++) {
@@ -132,31 +142,19 @@ int** matrix_create(int squaredDim) {
     return self;
 }
 
-int score_of_matrix_on_bingo(t_matrix_analysis fewestDrawsMatrix, int* drawSequence, int squaredDim) {
-    int sum = 0;
-    for(int i = 0; i < squaredDim; i++) {
-        for(int j = 0; j < squaredDim; j++) {
-            if(!fewestDrawsMatrix.markGrid[j][i]) {
-                sum += fewestDrawsMatrix.matrix[j][i];
-            }
-        }
-    }
-    return sum * drawSequence[fewestDrawsMatrix.drawsUntilWin - 1];
-}
-
-void free_matrix(void** matrix, int squaredDim) {
+void matrix_destroy(void** matrix, int squaredDim) {
     for(int j = 0; j < squaredDim; j++) {
         free(matrix[j]);
     }
     free(matrix);
 }
 
-void free_matrix_analysis_allocator(t_matrix_analysis* matrixAnalysisAllocator, int matrixAnalysisAllocatorSize, int squaredDim) {
+void matrix_analysis_allocator_destroy(t_matrix_analysis* matrixAnalysisAllocator, int matrixAnalysisAllocatorSize, int squaredDim) {
     for(int i = 0; i < matrixAnalysisAllocatorSize - 1; i++) {
         bool** markGrid = matrixAnalysisAllocator[i].markGrid;
         int** matrix = matrixAnalysisAllocator[i].matrix;
-        free_matrix((void**) markGrid, squaredDim);
-        free_matrix((void**) matrix, squaredDim);
+        matrix_destroy((void**) markGrid, squaredDim);
+        matrix_destroy((void**) matrix, squaredDim);
     }
     free(matrixAnalysisAllocator);
 }
@@ -179,10 +177,10 @@ void print_matrix_analysis(t_matrix_analysis matrixAnalysis, int squaredDim) {
 }
 
 int solution(FILE* input, int squaredDim, char* outcome) {
-    int drawSequenceSize = draw_sequence_size(input);
+    int drawSequenceSize = get_draw_sequence_size(input);
 
-    int* drawSequence = extract_draw_sequence(input, drawSequenceSize);
-    skip_until_next_matrix(input);
+    int* drawSequence = get_draw_sequence(input, drawSequenceSize);
+    skip_newlines_until_next_matrix(input);
 
     int matrixAnalysisAllocatorSize = 1;
     t_matrix_analysis* matrixAnalysisAllocator = calloc(matrixAnalysisAllocatorSize, sizeof(t_matrix_analysis));
@@ -198,8 +196,8 @@ int solution(FILE* input, int squaredDim, char* outcome) {
             if(y < squaredDim - 1) {
                 y++;
             } else if(y == squaredDim - 1) {
-                matrixAnalysisAllocator[matrixAnalysisAllocatorSize - 1] = matrix_analysis_until_win(squaredDim, matrix, drawSequence, drawSequenceSize);
-                skip_until_next_matrix(input);
+                matrixAnalysisAllocator[matrixAnalysisAllocatorSize - 1] = get_matrix_analysis_until_win(squaredDim, matrix, drawSequence, drawSequenceSize);
+                skip_newlines_until_next_matrix(input);
                 y = 0;
                 matrixAnalysisAllocator = realloc(matrixAnalysisAllocator, ++matrixAnalysisAllocatorSize * sizeof(t_matrix_analysis));
                 matrix = matrix_create(squaredDim);
@@ -216,11 +214,11 @@ int solution(FILE* input, int squaredDim, char* outcome) {
         matrixAnalysis = draws_matrix(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, maximize_draws);
     }
     print_matrix_analysis(matrixAnalysis, squaredDim);
-    int score = score_of_matrix_on_bingo(matrixAnalysis, drawSequence, squaredDim);
+    int score = get_score(matrixAnalysis, drawSequence, squaredDim);
 
     free(drawSequence);
-    free_matrix_analysis_allocator(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, squaredDim);
-    free_matrix((void**) matrix, squaredDim);
+    matrix_analysis_allocator_destroy(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, squaredDim);
+    matrix_destroy((void**) matrix, squaredDim);
 
     return score;
 }
