@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 
 typedef struct {
     bool** markGrid;
@@ -96,14 +97,31 @@ t_matrix_analysis matrix_analysis_until_win(int squaredDim, int** matrix, int* d
     return matrixAnalysis;
 }
 
-t_matrix_analysis fewest_draws_matrix(t_matrix_analysis* matrixAnalysisAllocator, int matrixAnalysisAllocatorSize) {
-    t_matrix_analysis lowest = matrixAnalysisAllocator[0];
+t_matrix_analysis draws_matrix(t_matrix_analysis* matrixAnalysisAllocator, int matrixAnalysisAllocatorSize,
+                                bool(*condition)(int drawsUntilWin1, int drawsUntilWin2)) {
+    t_matrix_analysis matrixAnalysisAux = matrixAnalysisAllocator[0];
     for(int i = 1; i < matrixAnalysisAllocatorSize - 1; i++) {
-        if(matrixAnalysisAllocator[i].drawsUntilWin < lowest.drawsUntilWin) {
-            lowest = matrixAnalysisAllocator[i];
+        if(condition(matrixAnalysisAllocator[i].drawsUntilWin, matrixAnalysisAux.drawsUntilWin)) {
+            matrixAnalysisAux = matrixAnalysisAllocator[i];
         }
     }
-    return lowest;
+    return matrixAnalysisAux;
+}
+
+bool maximize_draws(int drawsUntilWin1, int drawsUntilWin2) {
+    return drawsUntilWin1 > drawsUntilWin2;
+}
+
+bool minimize_draws(int drawsUntilWin1, int drawsUntilWin2) {
+    return drawsUntilWin1 < drawsUntilWin2;
+}
+
+bool is_octo_lose(char* outcome) {
+    return strcmp(outcome, "OCTOLOSE") == 0;
+}
+
+bool is_octo_win(char* outcome) {
+    return strcmp(outcome, "OCTOWIN") == 0;
 }
 
 int** matrix_create(int squaredDim) {
@@ -143,7 +161,24 @@ void free_matrix_analysis_allocator(t_matrix_analysis* matrixAnalysisAllocator, 
     free(matrixAnalysisAllocator);
 }
 
-int solution(FILE* input, int squaredDim) {
+void print_matrix_analysis(t_matrix_analysis matrixAnalysis, int squaredDim) {
+    printf("DRAWS UNTIL WIN: %d\n", matrixAnalysis.drawsUntilWin);
+    for(int i = 0; i < squaredDim; i++) {
+        for(int j = 0; j < squaredDim; j++) {
+            printf("%d\t", matrixAnalysis.matrix[j][i]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+    for(int i = 0; i < squaredDim; i++) {
+        for(int j = 0; j < squaredDim; j++) {
+            printf("%d\t", matrixAnalysis.markGrid[j][i]);
+        }
+        printf("\n");
+    }
+}
+
+int solution(FILE* input, int squaredDim, char* outcome) {
     int drawSequenceSize = draw_sequence_size(input);
 
     int* drawSequence = extract_draw_sequence(input, drawSequenceSize);
@@ -172,8 +207,16 @@ int solution(FILE* input, int squaredDim) {
         }
     }
 
-    t_matrix_analysis fewestDrawsMatrix = fewest_draws_matrix(matrixAnalysisAllocator, matrixAnalysisAllocatorSize);
-    int score = score_of_matrix_on_bingo(fewestDrawsMatrix, drawSequence, squaredDim);
+    t_matrix_analysis matrixAnalysis;
+    if(is_octo_lose(outcome)) {
+        printf("OCTOLOSE!\n");
+        matrixAnalysis = draws_matrix(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, minimize_draws);
+    } else if(is_octo_win(outcome)) {
+        printf("OCTOWIN!\n");
+        matrixAnalysis = draws_matrix(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, maximize_draws);
+    }
+    print_matrix_analysis(matrixAnalysis, squaredDim);
+    int score = score_of_matrix_on_bingo(matrixAnalysis, drawSequence, squaredDim);
 
     free(drawSequence);
     free_matrix_analysis_allocator(matrixAnalysisAllocator, matrixAnalysisAllocatorSize, squaredDim);
@@ -182,13 +225,13 @@ int solution(FILE* input, int squaredDim) {
     return score;
 }
 
-int main(int argc, char *argv[] /*ARGS="../input.txt 5"*/) {
+int main(int argc, char *argv[] /*ARGS="../input.txt 5 (OCTOLOSE | OCTOWIN)"*/) {
     FILE* input = fopen(argv[1], "r");
     if(input == NULL) {
         perror("Failed");
         return -1;
     } else {
-        int answer = solution(input, atoi(argv[2]));
+        int answer = solution(input, atoi(argv[2]), argv[3]);
         printf("Answer: %d\n", answer);
     }
     fclose(input);
