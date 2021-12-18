@@ -154,4 +154,4 @@ cmake-build-debug
 */obj/
 *.log
 plain/
-*makefile
+makefile
