@@ -105,46 +105,134 @@ void set_one_dim_initial_final_point(t_point* iPoint, t_point* fPoint, t_point p
     }
 }
 
+void set_two_dim_initial_final_point(t_point* iPoint, t_point* fPoint, t_point p1, t_point p2) {
+    if(p1.x < p2.x) {
+        iPoint->x = p1.x;
+        iPoint->y = p1.y;
+        fPoint->x = p2.x;
+        fPoint->y = p2.y;
+    } else {
+        iPoint->x = p2.x;
+        iPoint->y = p2.y;
+        fPoint->x = p1.x;
+        fPoint->y = p1.y;
+    }
+}
+
+bool is_northwest_southeast(t_point p1, t_point p2) {
+    return (p1.x < p2.x && p1.y < p2.y) || (p1.x > p2.x && p1.y > p2.y);
+}
+
+bool is_northeast_southwest(t_point p1, t_point p2) {
+    return (p1.x > p2.x && p1.y < p2.y) || (p1.x < p2.x && p1.y > p2.y);
+}
+
+t_point* generate_one_dim_points(t_point* points, int* currSize, t_point iPoint, t_point fPoint, t_point p1, t_point p2) {
+    int x = iPoint.x;
+    int y = iPoint.y;
+    while(x <= fPoint.x && y <= fPoint.y) {
+        t_point point = {
+            .x = x,
+            .y = y
+        };
+        points[*currSize - 1] = point;
+        if(y < fPoint.y || x < fPoint.x) {
+            points = realloc(points, ++(*currSize) * sizeof(t_point));
+        }
+        if(is_vertical_vent(p1, p2)) {
+            y++;
+        } else if(is_horizontal_vent(p1, p2)) {
+            x++;
+        }
+    }
+    return points;
+}
+
+t_point* generate_two_dim_points(t_point* points, int* currSize, t_point iPoint, t_point fPoint, t_point p1, t_point p2,
+                                 bool (*loop_condition)(int x, int y, t_point point),
+                                 bool (*realloc_condition)(int x, int y, t_point point),
+                                 void (*post_index_increment)(int* x, int* y)) {
+    int x = iPoint.x;
+    int y = iPoint.y;
+    while(loop_condition(x, y, fPoint)) {
+        t_point point = {
+            .x = x,
+            .y = y
+        };
+        points[*currSize - 1] = point;
+        if(realloc_condition(x, y, fPoint)) {
+            points = realloc(points, ++(*currSize) * sizeof(t_point));
+        }
+        post_index_increment(&x, &y);
+    }
+    return points;
+}
+
+bool northwest_southeast_loop_condition(int x, int y, t_point point) {
+    return x <= point.x && y <= point.y;
+}
+
+bool northeast_southwest_loop_condition(int x, int y, t_point point) {
+    return x <= point.x && y >= point.y;
+}
+
+bool northwest_southeast_realloc_condition(int x, int y, t_point point) {
+    return x < point.x && y < point.y;
+}
+
+bool northeast_southwest_realloc_condition(int x, int y, t_point point) {
+    return x < point.x && y > point.y;
+}
+
+void northeast_southwest_post_index_increment(int* x, int* y) {
+    (*x)++;
+    (*y)--;
+}
+
+void northwest_southeast_post_index_increment(int* x, int* y) {
+    (*x)++;
+    (*y)++;
+}
+
 t_path* path_create(t_point p1, t_point p2) {
     int currSize = 0;
     t_point* points = NULL;
     t_path* path = NULL;
+    points = calloc(++currSize, sizeof(t_point));
+    path = malloc(sizeof(t_path));
+
+    t_point iPoint = {
+        .x = -1,
+        .y = -1
+    };
+    t_point fPoint = {
+        .x = -1,
+        .y = -1
+    };
+
     if(!is_diagonal_vent(p1, p2)) {
-        points = calloc(++currSize, sizeof(t_point));
-        path = malloc(sizeof(t_path));
-        t_point iPoint = {
-            .x = -1,
-            .y = -1
-        };
-        t_point fPoint = {
-            .x = -1,
-            .y = -1
-        };
         set_one_dim_initial_final_point(&iPoint, &fPoint, p1, p2);
-
-        int x = iPoint.x;
-        int y = iPoint.y;
-
-        while(x <= fPoint.x && y <= fPoint.y) {
-            t_point point = {
-                .x = x,
-                .y = y
-            };
-            points[currSize - 1] = point;
-            if(y < fPoint.y || x < fPoint.x) {
-                points = realloc(points, ++currSize * sizeof(t_point));
-            }
-            if(is_vertical_vent(p1, p2)) {
-                y++;
-            } else if(is_horizontal_vent(p1, p2)) {
-                x++;
-            }
-        }
-        path->numberOfPoints = currSize;
-        path->points = points;
+        points = generate_one_dim_points(points, &currSize, iPoint, fPoint, p1, p2);
     } else {
-        return NULL;
+        set_two_dim_initial_final_point(&iPoint, &fPoint, p1, p2);
+        if(is_northwest_southeast(p1, p2)) {
+            points = generate_two_dim_points(
+                points, &currSize, iPoint, fPoint, p1, p2,
+                northwest_southeast_loop_condition,
+                northwest_southeast_realloc_condition,
+                northwest_southeast_post_index_increment
+            );
+        } else if(is_northeast_southwest(p1, p2)) {
+            points = generate_two_dim_points(
+                points, &currSize, iPoint, fPoint, p1, p2,
+                northeast_southwest_loop_condition,
+                northeast_southwest_realloc_condition,
+                northeast_southwest_post_index_increment
+            );
+        }
     }
+    path->numberOfPoints = currSize;
+    path->points = points;
     return path;
 }
 
@@ -174,7 +262,7 @@ void register_paths(FILE* input, int maxDim, int** matrix) {
         if(path == NULL) {
             continue;
         }
-        print_points(path);
+        // print_points(path);
         register_points(path, maxDim, matrix);
         path_destroy(path);
     }
@@ -199,7 +287,7 @@ int solution(FILE* input) {
         matrix[i] = calloc(maxDim, sizeof(int));
     }
     register_paths(input, maxDim, matrix);
-    print_matrix(matrix, maxDim);
+    // print_matrix(matrix, maxDim);
     int overlappedPoints = number_of_points_where_at_least_n_lines_overlap(2, matrix, maxDim);
     matrix_destroy((void**) matrix, maxDim);
     return overlappedPoints;
