@@ -8,14 +8,28 @@
 #define NUMBER_OF_SEGMENTS 7
 
 typedef struct {
-    bool** digitOutputValue;
+    char** digitOutputValue;
 } t_entry;
+
+void print_entry(t_entry* entry, int numberOfDigitsInDisplay) {
+    for(int i = 0; i < numberOfDigitsInDisplay; i++) {
+        printf("%s ", entry->digitOutputValue[i]);
+        printf("\n");
+    }
+}
+
+void print_entries(t_entry** entries, int numberOfDigitsInDisplay, int numberOfEntries) {
+    for(int i = 0; i < numberOfEntries; i++) {
+        print_entry(entries[i], numberOfDigitsInDisplay);
+        printf("\n");
+    }
+}
 
 t_entry* entry_create(int numberOfDigitsInDisplay) {
     t_entry* self = malloc(sizeof(t_entry));
-    self->digitOutputValue = calloc(numberOfDigitsInDisplay, sizeof(bool*));
+    self->digitOutputValue = calloc(numberOfDigitsInDisplay, sizeof(char*));
     for (int i = 0; i < numberOfDigitsInDisplay; i++) {
-        self->digitOutputValue[i] = calloc(NUMBER_OF_SEGMENTS, sizeof(bool));
+        self->digitOutputValue[i] = calloc(NUMBER_OF_SEGMENTS + 1, sizeof(char));
     }
     return self;
 }
@@ -26,6 +40,13 @@ void entry_destroy(t_entry* self, int numberOfDigitsInDisplay) {
     }
     free(self->digitOutputValue);
     free(self);
+}
+
+void entries_destroy(t_entry** entries, int numberOfEntries, int numberOfDigitsInDisplay) {
+    for(int i = 0; i < numberOfEntries; i++) {
+        entry_destroy(entries[i], numberOfDigitsInDisplay);
+    }
+    free(entries);
 }
 
 int get_number_of_entries(FILE* input) {
@@ -40,42 +61,6 @@ int get_number_of_entries(FILE* input) {
     return numberOfEntries;
 }
 
-void print_entry(t_entry* entry, int numberOfDigitsInDisplay) {
-    for(int i = 0; i < numberOfDigitsInDisplay; i++) {
-        for (int j = 0; j < NUMBER_OF_SEGMENTS; j++) {
-            printf("%d ", entry->digitOutputValue[i][j]);
-        }
-        printf("\n");
-    }
-}
-
-void print_entries(t_entry** entries, int numberOfDigitsInDisplay, int numberOfEntries) {
-    for(int i = 0; i < numberOfEntries; i++) {
-        print_entry(entries[i], numberOfDigitsInDisplay);
-        printf("\n");
-    }
-}
-
-int get_segment_index(char c) {
-    switch(c) {
-        case 'a':
-            return 0;
-        case 'b':
-            return 1;
-        case 'c':
-            return 2;
-        case 'd':
-            return 3;
-        case 'e':
-            return 4;
-        case 'f':
-            return 5;
-        case 'g':
-            return 6;
-    }
-    return -1;
-}
-
 t_entry* extract_entry(FILE* input, t_entry* entry, int numberOfSignalPatterns, int numberOfDigitsInDisplay) {
     char* sequence = calloc(NUMBER_OF_SEGMENTS + 1, sizeof(char));
     for(int i = 0; i < numberOfSignalPatterns; i++) {
@@ -84,20 +69,10 @@ t_entry* extract_entry(FILE* input, t_entry* entry, int numberOfSignalPatterns, 
     fscanf(input, "| ");
     for(int i = 0; i < numberOfDigitsInDisplay; i++) {
         fscanf(input, "%s ", sequence);
-        for(int j = 0; isalpha(sequence[j]); j++) {
-            int segmentIndex = get_segment_index(sequence[j]);
-            entry->digitOutputValue[i][segmentIndex] = true;
-        }
+        strcpy(entry->digitOutputValue[i], sequence);
     }
     free(sequence);
     return entry;
-}
-
-void entries_destroy(t_entry** entries, int numberOfEntries, int numberOfDigitsInDisplay) {
-    for(int i = 0; i < numberOfEntries; i++) {
-        entry_destroy(entries[i], numberOfDigitsInDisplay);
-    }
-    free(entries);
 }
 
 bool is_unique_number_of_segments(int numberOfActiveSegments) {
@@ -107,23 +82,13 @@ bool is_unique_number_of_segments(int numberOfActiveSegments) {
             numberOfActiveSegments == 7;
 }
 
-int get_number_of_active_segments(bool* digit) {
-    int numberOfActiveSegments = 0;
-    for(int i = 0; i < NUMBER_OF_SEGMENTS; i++) {
-        if(digit[i]) {
-            numberOfActiveSegments++;
-        }
-    }
-    return numberOfActiveSegments;
-}
-
 int easy_digits_ocurrences(t_entry** entries, int numberOfEntries, int numberOfDigitsInDisplay) {
     int ocurrences = 0;
     for(int i = 0; i < numberOfEntries; i++) {
         t_entry* entry = entries[i];
         for(int j = 0; j < numberOfDigitsInDisplay; j++) {
-            bool* digit = entry->digitOutputValue[j];
-            int numberOfActiveSegments = get_number_of_active_segments(digit);
+            char* digit = entry->digitOutputValue[j];
+            int numberOfActiveSegments = strlen(digit);
             if(is_unique_number_of_segments(numberOfActiveSegments)) {
                 ocurrences++;
             }
