@@ -63,6 +63,11 @@ void matrix_destroy(void** matrix, int dim) {
     free(matrix);
 }
 
+void map_destroy(t_map* map) {
+    matrix_destroy((void**) map->matrix, map->rows);
+    free(map);
+}
+
 t_point* possible_moves(t_map* map, t_point* moves, t_point currPoint, int* size) {
     int possibleMoves[POSSIBLE_MOVES_SIZE][2] = {
         {currPoint.x, currPoint.y + 1}, /* shift up     */
@@ -133,8 +138,7 @@ int solution(FILE* input) {
     map = set_lower_adjacent_points(map);
     print_lower_points(map);
     int riskLevel = risk_level(map);
-    matrix_destroy((void**) map->matrix, map->rows);
-    free(map);
+    map_destroy(map);
     return riskLevel;
 }
 
