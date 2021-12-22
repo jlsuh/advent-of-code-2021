@@ -61,9 +61,9 @@ int get_number_of_entries(FILE* input) {
     return numberOfEntries;
 }
 
-t_entry* extract_entry(FILE* input, t_entry* entry, int numberOfSignalPatterns, int numberOfDigitsInDisplay) {
+t_entry* extract_entry(FILE* input, t_entry* entry, int numberOfUniqueSignalPatterns, int numberOfDigitsInDisplay) {
     char* sequence = calloc(NUMBER_OF_SEGMENTS + 1, sizeof(char));
-    for(int i = 0; i < numberOfSignalPatterns; i++) {
+    for(int i = 0; i < numberOfUniqueSignalPatterns; i++) {
         fscanf(input, "%s ", sequence);
     }
     fscanf(input, "| ");
@@ -97,12 +97,12 @@ int easy_digits_ocurrences(t_entry** entries, int numberOfEntries, int numberOfD
     return ocurrences;
 }
 
-int solution(FILE* input, int numberOfSignalPatterns, int numberOfDigitsInDisplay) {
+int solution(FILE* input, int numberOfUniqueSignalPatterns, int numberOfDigitsInDisplay) {
     int numberOfEntries = get_number_of_entries(input);
     t_entry** entries = calloc(numberOfEntries, sizeof(t_entry*));
     for (int i = 0; i < numberOfEntries; i++) {
         entries[i] = entry_create(numberOfDigitsInDisplay);
-        entries[i] = extract_entry(input, entries[i], numberOfSignalPatterns, numberOfDigitsInDisplay);
+        entries[i] = extract_entry(input, entries[i], numberOfUniqueSignalPatterns, numberOfDigitsInDisplay);
     }
     int easyDigits = easy_digits_ocurrences(entries, numberOfEntries, numberOfDigitsInDisplay);
 
