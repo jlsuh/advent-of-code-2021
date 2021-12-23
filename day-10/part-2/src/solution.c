@@ -107,25 +107,6 @@ t_stack* stack_reverse(t_stack* stack) {
     return reversed;
 }
 
-void stack_pruint64_t(t_stack* stack) {
-    t_node* node = stack->head;
-    while(node != NULL) {
-        printf("%c ", node->data);
-        node = node->next;
-    }
-}
-
-void stack_array_pruint64_t(t_stack** incompleteSyntax, uint64_t size) {
-    for(uint64_t i = 0; i < size; i++) {
-        if(incompleteSyntax[i] != NULL) {
-            printf("%ld: ", i);
-            stack_pruint64_t(incompleteSyntax[i]);
-        } else {
-            printf("Illegal incompleteSyntax at index %ld\n", i);
-        }
-    }
-}
-
 uint64_t* bubble_sort(uint64_t* array, uint64_t size) {
     uint64_t temp = 0;
     for(uint64_t i = 0; i < size; i++) {
@@ -217,9 +198,6 @@ uint64_t solution(FILE* input) {
     t_stack** completeSyntax = get_array_of_complete_chunks(incompleteSyntax, size);
     uint64_t* scores = get_scores(completeSyntax, size);
     scores = bubble_sort(scores, size);
-    for(uint64_t i = 0; i < size; i++) {
-        printf("Score %ld: %ld\n", i, scores[i]);
-    }
     uint64_t middleScore = get_middle_score(scores, size);
     stack_array_destroy(completeSyntax, size);
     stack_array_destroy(incompleteSyntax, size);
