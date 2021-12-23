@@ -146,6 +146,10 @@ int array_product(int* array, int size) {
     return product;
 }
 
+bool is_valid_location(t_cell* cell) {
+    return cell->value != 9 && !cell->visited;
+}
+
 int current_basin_group_size(t_map* map, int i, int j) {
     int basinSize = 0;
     int possibleMovesSize = 0;
@@ -155,7 +159,7 @@ int current_basin_group_size(t_map* map, int i, int j) {
     for(int k = 0; k < possibleMovesSize; k++) {
         t_point move = possibleMoves[k];
         t_cell* adjacent = &map->matrix[move.y][move.x];
-        if(adjacent->value != 9 && !adjacent->visited) {
+        if(is_valid_location(adjacent)) {
             adjacent->visited = true;
             basinSize += 1 + current_basin_group_size(map, move.y, move.x);
         }
