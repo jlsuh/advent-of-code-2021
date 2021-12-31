@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <string.h>
 
-#define MAX_LEN 8
+#define MAX_LEN 9
 
 typedef struct {
     char* rowName;
@@ -109,6 +109,17 @@ bool is_start(char* str) {
     return strcmp(str, "start") == 0;
 }
 
+t_cave* find_cave(t_matrix* cavesMatrix, char* caveName) {
+    t_cave* target = NULL;
+    for(int i = 0; i < cavesMatrix->squaredDim; i++) {
+        target = cavesMatrix->caves[i];
+        if(strcmp(target->rowName, caveName) == 0) {
+            break;
+        }
+    }
+    return target;
+}
+
 void set_relations(FILE* input, t_matrix* cavesMatrix) {
     char* temp = calloc(MAX_LEN, sizeof(char));
     while(fscanf(input, "%s", temp) != EOF) {
@@ -118,8 +129,10 @@ void set_relations(FILE* input, t_matrix* cavesMatrix) {
             if(strcmp(cavesMatrix->caves[i]->rowName, leftMember) == 0) {
                 for(int j = 0; j < cavesMatrix->squaredDim; j++) {
                     if(strcmp(cavesMatrix->caves[i][j].colName, rightMember) == 0) {
-                        cavesMatrix->caves[i][j].related = true;
-                        if(!is_start(leftMember) && !is_start(rightMember) && !is_end(leftMember) && !is_end(rightMember)) {
+                        if(!is_start(rightMember) && !is_end(leftMember)) {
+                            cavesMatrix->caves[i][j].related = true;
+                        }
+                        if(!is_start(leftMember) && !is_end(rightMember)) {
                             cavesMatrix->caves[j][i].related = true;
                         }
                     }
@@ -153,17 +166,6 @@ void print_grammar(t_matrix* cavesMatrix) {
         }
     }
     printf("\n");
-}
-
-t_cave* find_cave(t_matrix* cavesMatrix, char* caveName) {
-    t_cave* target = NULL;
-    for(int i = 0; i < cavesMatrix->squaredDim; i++) {
-        target = cavesMatrix->caves[i];
-        if(strcmp(target->rowName, caveName) == 0) {
-            break;
-        }
-    }
-    return target;
 }
 
 bool is_small_cave(char* str) {
