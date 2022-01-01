@@ -153,6 +153,28 @@ void print_grammar(t_matrix* cavesMatrix) {
     printf("\n");
 }
 
+void _(void) {
+    char* _[] = {
+        "⠀     ⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⡄",
+        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠛⣿⣟⣛⣃⡀",
+        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⠿⠿⠟",
+        "⠀⠀⠀⣀⣀⣀⣀⣀⣀⣀⣶⠿⢿⣆⣀⣀⣀⣀",
+        " ⢠⡾⠋⠉⠉⠉⠉⠉⠉⠉  ⠉⠉⠉⠉⠉⠛⠛⢦⡀",
+        " ⢸⡇      COPIUM         ⢸⡇",
+        " ⢸⡇                      ⣷",
+        " ⣸⡆                       ⣟",
+        " ⣿⡇                        ⣿",
+        " ⢻⡇                        ⢸⡏",
+        " ⢸⡇                        ⣿",
+        " ⢸⡇40Liters               ⣷",
+        " ⠘⢷⣄⣀⣀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⣀⡀⡀⢀⣿",
+        " ⠀⠀⠀⠀⠉⠉⠉⠉⠙⠛⠛⠛⠛⠛⠛⠛⠋⠉⠉⠉⠁"
+    };
+    for(int i = 0; i < 14; i++) {
+        printf("%s\n", _[i]);
+    }
+}
+
 bool is_end(char* str) {
     return strcmp(str, "end") == 0;
 }
@@ -329,5 +351,6 @@ int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
     time(&end);
     double diffT = difftime(end, start);
     printf("Time diff: %.2f\n", diffT);
+    _();
     return 0;
 }
