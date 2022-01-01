@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_LEN 9
 
@@ -22,10 +23,52 @@ typedef struct {
     int occurrences;
 } t_traverse;
 
+t_matrix* matrix_create(char** caveNames, int dim) {
+    t_matrix* self = malloc(sizeof(t_matrix));
+    self->squaredDim = dim;
+    self->caves = calloc(dim, sizeof(t_cave*));
+    for(int i = 0; i < dim; i++) {
+        self->caves[i] = calloc(dim, sizeof(t_cave));
+        for(int j = 0; j < dim; j++) {
+            self->caves[i][j].rowName = calloc(MAX_LEN, sizeof(char));
+            self->caves[i][j].colName = calloc(MAX_LEN, sizeof(char));
+            self->caves[i][j].related = false;
+            if(i == j) {
+                strcpy(self->caves[i][j].rowName, caveNames[i]);
+                strcpy(self->caves[i][j].colName, caveNames[i]);
+            } else {
+                strcpy(self->caves[i][j].rowName, caveNames[i]);
+                strcpy(self->caves[i][j].colName, caveNames[j]);
+            }
+        }
+    }
+    return self;
+}
+
 void matrix_destroy(void** matrix, int dim) {
     for(int i = 0; i < dim; i++) {
         free(matrix[i]);
     }
+    free(matrix);
+}
+
+void traverse_destroy(t_traverse* traversedSmallCavesAux, int traversedSize) {
+    for(int i = 0; i < traversedSize; i++) {
+        free(traversedSmallCavesAux[i].smallCaveName);
+    }
+    free(traversedSmallCavesAux);
+}
+
+void row_column_destroy(void* matrixVoid) {
+    t_matrix* matrix = (t_matrix*) matrixVoid;
+    for(int i = 0; i < matrix->squaredDim; i++) {
+        for(int j = 0; j < matrix->squaredDim; j++) {
+            free(matrix->caves[i][j].rowName);
+            free(matrix->caves[i][j].colName);
+        }
+        free(matrix->caves[i]);
+    }
+    free(matrix->caves);
     free(matrix);
 }
 
@@ -58,39 +101,14 @@ char** cave_names(FILE* input, int* caveSize) {
     return caveNames;
 }
 
-t_matrix* matrix_create(char** caveNames, int dim) {
-    t_matrix* self = malloc(sizeof(t_matrix));
-    self->squaredDim = dim;
-    self->caves = calloc(dim, sizeof(t_cave*));
-    for(int i = 0; i < dim; i++) {
-        self->caves[i] = calloc(dim, sizeof(t_cave));
-        for(int j = 0; j < dim; j++) {
-            self->caves[i][j].rowName = calloc(MAX_LEN, sizeof(char));
-            self->caves[i][j].colName = calloc(MAX_LEN, sizeof(char));
-            self->caves[i][j].related = false;
-            if(i == j) {
-                strcpy(self->caves[i][j].rowName, caveNames[i]);
-                strcpy(self->caves[i][j].colName, caveNames[i]);
-            } else {
-                strcpy(self->caves[i][j].rowName, caveNames[i]);
-                strcpy(self->caves[i][j].colName, caveNames[j]);
-            }
+int occurences_greater_or_equal_than(int limit, t_traverse* traversedSmallCaves, int traversedSize) {
+    int occurences = 0;
+    for(int i = 0; i < traversedSize; i++) {
+        if(traversedSmallCaves[i].occurrences >= limit) {
+            occurences++;
         }
     }
-    return self;
-}
-
-void row_column_destroy(void* matrixVoid) {
-    t_matrix* matrix = (t_matrix*) matrixVoid;
-    for(int i = 0; i < matrix->squaredDim; i++) {
-        for(int j = 0; j < matrix->squaredDim; j++) {
-            free(matrix->caves[i][j].rowName);
-            free(matrix->caves[i][j].colName);
-        }
-        free(matrix->caves[i]);
-    }
-    free(matrix->caves);
-    free(matrix);
+    return occurences;
 }
 
 void print_caves(t_matrix* cavesMatrix) {
@@ -111,12 +129,69 @@ void print_caves(t_matrix* cavesMatrix) {
     printf("\n");
 }
 
+void print_grammar(t_matrix* cavesMatrix) {
+    for(int i = 0; i < cavesMatrix->squaredDim; i++) {
+        t_cave* cave = cavesMatrix->caves[i];
+        if(strcmp(cave->rowName, "end") != 0) {
+            printf("%s -> ", cave->rowName);
+            bool pipe = false;
+            for(int j = 0; j < cavesMatrix->squaredDim; j++) {
+                if(cave[j].related) {
+                    if(pipe) {
+                        printf("| ");
+                        pipe = false;
+                    }
+                    printf("%s ", cave[j].colName);
+                    pipe = true;
+                }
+                if(j == cavesMatrix->squaredDim - 1) {
+                    printf("\n");
+                }
+            }
+        }
+    }
+    printf("\n");
+}
+
 bool is_end(char* str) {
     return strcmp(str, "end") == 0;
 }
 
 bool is_start(char* str) {
     return strcmp(str, "start") == 0;
+}
+
+bool is_small_cave(char* str) {
+    return islower(str[0]);
+}
+
+bool is_valid_ocurrences(t_traverse* traversedSmallCaves, int traversedSize, char* name) {
+    for(int i = 0; i < traversedSize; i++) {
+        if(strcmp(traversedSmallCaves[i].smallCaveName, name) == 0) {
+            int occurrences = traversedSmallCaves[i].occurrences;
+            if(occurrences == 0) {
+                return true;
+            } else if(occurrences == 1) {
+                if(occurences_greater_or_equal_than(2, traversedSmallCaves, traversedSize) == 0) {
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool is_traversed_cave(t_traverse* traversedSmallCaves, char* caveName, int traversedSize) {
+    for(int i = 0; i < traversedSize; i++) {
+        char* name = traversedSmallCaves[i].smallCaveName;
+        if(name != NULL && strcmp(name, caveName) == 0 && is_valid_ocurrences(traversedSmallCaves, traversedSize, name)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 t_cave* find_cave(t_matrix* cavesMatrix, char* caveName) {
@@ -154,71 +229,15 @@ void set_relations(FILE* input, t_matrix* cavesMatrix) {
     free(temp);
 }
 
-void print_grammar(t_matrix* cavesMatrix) {
+int get_number_of_small_caves(t_matrix* cavesMatrix) {
+    int numberOfSmallCaves = 0;
     for(int i = 0; i < cavesMatrix->squaredDim; i++) {
         t_cave* cave = cavesMatrix->caves[i];
-        if(strcmp(cave->rowName, "end") != 0) {
-            printf("%s -> ", cave->rowName);
-            bool pipe = false;
-            for(int j = 0; j < cavesMatrix->squaredDim; j++) {
-                if(cave[j].related) {
-                    if(pipe) {
-                        printf("| ");
-                        pipe = false;
-                    }
-                    printf("%s ", cave[j].colName);
-                    pipe = true;
-                }
-                if(j == cavesMatrix->squaredDim - 1) {
-                    printf("\n");
-                }
-            }
+        if(!is_start(cave->rowName) && !is_end(cave->rowName) && is_small_cave(cave->rowName)) {
+            numberOfSmallCaves++;
         }
     }
-    printf("\n");
-}
-
-bool is_small_cave(char* str) {
-    return islower(str[0]);
-}
-
-int occurences_greater_or_equal_than(int limit, t_traverse* traversedSmallCaves, int traversedSize) {
-    int occurences = 0;
-    for(int i = 0; i < traversedSize; i++) {
-        if(traversedSmallCaves[i].occurrences >= limit) {
-            occurences++;
-        }
-    }
-    return occurences;
-}
-
-bool valid_ocurrences(t_traverse* traversedSmallCaves, int traversedSize, char* name) {
-    for(int i = 0; i < traversedSize; i++) {
-        if(strcmp(traversedSmallCaves[i].smallCaveName, name) == 0) {
-            int occurrences = traversedSmallCaves[i].occurrences;
-            if(occurrences == 0) {
-                return true;
-            } else if(occurrences == 1) {
-                if(occurences_greater_or_equal_than(2, traversedSmallCaves, traversedSize) == 0) {
-                    return false;
-                } else {
-                    return true;
-                }
-            }
-            return true;
-        }
-    }
-    return false;
-}
-
-bool traversed_cave(t_traverse* traversedSmallCaves, char* caveName, int traversedSize) {
-    for(int i = 0; i < traversedSize; i++) {
-        char* name = traversedSmallCaves[i].smallCaveName;
-        if(name != NULL && strcmp(name, caveName) == 0 && valid_ocurrences(traversedSmallCaves, traversedSize, name)) {
-            return true;
-        }
-    }
-    return false;
+    return numberOfSmallCaves;
 }
 
 int get_index(t_traverse* traversedSmallCaves, int traversedSize, char* name) {
@@ -228,13 +247,6 @@ int get_index(t_traverse* traversedSmallCaves, int traversedSize, char* name) {
         }
     }
     return -1;
-}
-
-void traverse_destroy(t_traverse* traversedSmallCavesAux, int traversedSize) {
-    for(int i = 0; i < traversedSize; i++) {
-        free(traversedSmallCavesAux[i].smallCaveName);
-    }
-    free(traversedSmallCavesAux);
 }
 
 int get_number_of_paths(t_cave* start, t_matrix* cavesMatrix, int numberOfPaths, t_traverse* traversedSmallCaves, int traversedSize) {
@@ -255,7 +267,7 @@ int get_number_of_paths(t_cave* start, t_matrix* cavesMatrix, int numberOfPaths,
                 traverse_destroy(traversedSmallCavesAux, traversedSize);
                 continue;
             } else if(is_small_cave(cave.colName)) {
-                if(traversed_cave(traversedSmallCavesAux, cave.colName, traversedSize)) {
+                if(is_traversed_cave(traversedSmallCavesAux, cave.colName, traversedSize)) {
                     traverse_destroy(traversedSmallCavesAux, traversedSize);
                     continue;
                 } else {
@@ -272,17 +284,6 @@ int get_number_of_paths(t_cave* start, t_matrix* cavesMatrix, int numberOfPaths,
         traverse_destroy(traversedSmallCavesAux, traversedSize);
     }
     return numberOfPaths;
-}
-
-int get_number_of_small_caves(t_matrix* cavesMatrix) {
-    int numberOfSmallCaves = 0;
-    for(int i = 0; i < cavesMatrix->squaredDim; i++) {
-        t_cave* cave = cavesMatrix->caves[i];
-        if(!is_start(cave->rowName) && !is_end(cave->rowName) && is_small_cave(cave->rowName)) {
-            numberOfSmallCaves++;
-        }
-    }
-    return numberOfSmallCaves;
 }
 
 int solution(FILE* input) {
@@ -313,6 +314,8 @@ int solution(FILE* input) {
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
+    time_t start;
+    time(&start);
     FILE* input = fopen(argv[1], "r");
     if(input == NULL) {
         perror("Failed");
@@ -322,5 +325,9 @@ int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
         printf("Answer: %d\n", answer);
     }
     fclose(input);
+    time_t end;
+    time(&end);
+    double diffT = difftime(end, start);
+    printf("Time diff: %.2f\n", diffT);
     return 0;
 }

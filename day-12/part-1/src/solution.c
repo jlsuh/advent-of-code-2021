@@ -172,7 +172,7 @@ bool is_small_cave(char* str) {
     return islower(str[0]);
 }
 
-bool traversed_cave(char** traversedSmallCaves, char* caveName, int traversedSize) {
+bool is_traversed_cave(char** traversedSmallCaves, char* caveName, int traversedSize) {
     for(int i = 0; i < traversedSize; i++) {
         char* name = traversedSmallCaves[i];
         if(name != NULL && strcmp(name, caveName) == 0) {
@@ -208,7 +208,7 @@ int get_number_of_paths(t_cave* start, t_matrix* cavesMatrix, int numberOfPaths,
                 matrix_destroy((void**) traversedSmallCavesAux, traversedSize);
                 continue;
             } else if(is_small_cave(cave.colName)) {
-                if(traversed_cave(traversedSmallCavesAux, cave.colName, traversedSize)) {
+                if(is_traversed_cave(traversedSmallCavesAux, cave.colName, traversedSize)) {
                     matrix_destroy((void**) traversedSmallCavesAux, traversedSize);
                     continue;
                 } else {
