@@ -83,7 +83,7 @@ void node_matrix_print(t_node** self, size_t rows, size_t cols) {
     }
 }
 
-t_node* get_minimum_cost_node(t_node** matrix, size_t rows, size_t cols) {
+t_node* get_node_with_minimum_cost(t_node** matrix, size_t rows, size_t cols) {
     t_node* min = NULL;
     bool locateFirstMin = true;
     for(size_t i = 0; locateFirstMin && i < rows; i++) {
@@ -125,7 +125,7 @@ uint8_t** get_possible_moves(t_node* node, size_t rows, size_t cols, size_t* mov
 
 void generate_shortest_path_graph(t_node** nodeMatrix, uint8_t** cost, size_t rows, size_t cols) {
     for(size_t i = 0; i <= rows * cols - 1; i++) {
-        t_node* parent = get_minimum_cost_node(nodeMatrix, rows, cols);
+        t_node* parent = get_node_with_minimum_cost(nodeMatrix, rows, cols);
         parent->processed = true;
         size_t movesSize = 0;
         uint8_t** moves = get_possible_moves(parent, rows, cols, &movesSize);

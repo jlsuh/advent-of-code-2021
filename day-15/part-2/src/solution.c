@@ -3,7 +3,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <math.h>
-#include <pthread.h>
 
 #define POSSIBLE_MOVES_SIZE 4
 #define TILES 5
@@ -134,7 +133,6 @@ void hash_table_insert(t_node** hashTable, t_node* node, size_t cols) {
 void hash_table_remove(t_node** hashTable, t_node* node, size_t cols) {
     size_t index = hash(node, cols);
     hashTable[index] = NULL;
-    free(hashTable[index]);
 }
 
 bool hash_table_contains(t_node** hashTable, t_node* node, size_t cols) {
@@ -145,14 +143,12 @@ bool hash_table_contains(t_node** hashTable, t_node* node, size_t cols) {
     return false;
 }
 
-t_node* get_minimum_cost_node(t_node** hashTable, size_t rows, size_t cols) {
+t_node* get_node_with_minimum_cost(t_node** hashTable, size_t rows, size_t cols) {
     t_node* minNode = NULL;
     size_t index = 0;
     while(index < rows * cols) {
         if(hashTable[index] != NULL) {
-            if(minNode == NULL) {
-                minNode = hashTable[index];
-            } else if(hashTable[index]->cost < minNode->cost) {
+            if(minNode == NULL || hashTable[index]->cost < minNode->cost) {
                 minNode = hashTable[index];
             }
         }
@@ -175,7 +171,7 @@ t_node** generate_shortest_path_graph(t_node** nodeMatrix, uint8_t** cost, size_
     t_node** unprocessedNodes = hash_table_init(nodeMatrix, rows, cols);
     for(size_t i = 0; i < rows * cols; i++) {
         printf("Current: %ld\n", i + 1);
-        t_node* parent = get_minimum_cost_node(unprocessedNodes, rows, cols);
+        t_node* parent = get_node_with_minimum_cost(unprocessedNodes, rows, cols);
         hash_table_remove(unprocessedNodes, parent, cols);
         size_t movesSize = 0;
         uint32_t** moves = get_possible_moves(parent, rows, cols, &movesSize);
