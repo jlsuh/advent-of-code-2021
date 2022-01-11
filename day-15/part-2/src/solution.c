@@ -14,6 +14,7 @@ struct t_node {
     uint32_t x;
     uint32_t y;
     t_node* parent;
+    t_node* next;
 };
 
 void matrix_destroy(void** matrix, size_t dim) {
@@ -46,7 +47,6 @@ uint8_t** cost_matrix_create(FILE* input, size_t* rows, size_t* cols) {
             (*rows)++;
         }
     }
-    (*rows)++;
     rewind(input);
     printf("Rows: %ld | Cols: %ld\n", *rows, *cols);
     uint8_t cost = 0;
@@ -85,7 +85,8 @@ t_node node_create(double cost, uint32_t x, uint32_t y) {
         .cost = cost,
         .x = x,
         .y = y,
-        .parent = NULL
+        .parent = NULL,
+        .next = NULL
     };
     return self;
 }
@@ -96,6 +97,20 @@ t_node** node_matrix_create(size_t rows, size_t cols) {
         nodeMatrix[y] = malloc(cols * sizeof(t_node));
         for(size_t x = 0; x < cols; x++) {
             nodeMatrix[y][x] = node_create(INFINITY, x, y);
+        }
+    }
+    for(size_t i = 0; i < rows; i++) {
+        for(size_t j = 0; j < cols; j++) {
+            t_node* curr = &nodeMatrix[i][j];
+            t_node* next = NULL;
+            if(j == cols - 1) {
+                if(i < rows - 1) {
+                    next = &nodeMatrix[i + 1][0];
+                }
+            } else {
+                next = &nodeMatrix[i][j + 1];
+            }
+            curr->next = next;
         }
     }
     nodeMatrix[0][0].cost = 0;
@@ -130,9 +145,10 @@ void hash_table_insert(t_node** hashTable, t_node* node, size_t cols) {
     hashTable[index] = node;
 }
 
-void hash_table_remove(t_node** hashTable, t_node* node, size_t cols) {
+size_t hash_table_remove(t_node** hashTable, t_node* node, size_t cols) {
     size_t index = hash(node, cols);
     hashTable[index] = NULL;
+    return index;
 }
 
 bool hash_table_contains(t_node** hashTable, t_node* node, size_t cols) {
@@ -143,16 +159,14 @@ bool hash_table_contains(t_node** hashTable, t_node* node, size_t cols) {
     return false;
 }
 
-t_node* get_node_with_minimum_cost(t_node** hashTable, size_t rows, size_t cols) {
+t_node* get_node_with_minimum_cost(t_node* list) {
     t_node* minNode = NULL;
-    size_t index = 0;
-    while(index < rows * cols) {
-        if(hashTable[index] != NULL) {
-            if(minNode == NULL || hashTable[index]->cost < minNode->cost) {
-                minNode = hashTable[index];
-            }
+    t_node* curr = list;
+    while(curr != NULL) {
+        if(minNode == NULL || curr->cost < minNode->cost) {
+            minNode = curr;
         }
-        index++;
+        curr = curr->next;
     }
     return minNode;
 }
@@ -167,12 +181,29 @@ t_node** hash_table_init(t_node** nodeMatrix, size_t rows, size_t cols) {
     return hashTable;
 }
 
+void node_list_remove(t_node** list, t_node* node) {
+    t_node* curr = *list;
+    if(curr == node) {
+        *list = curr->next;
+        return;
+    }
+    while(curr->next != NULL) {
+        if(curr->next == node) {
+            curr->next = node->next;
+            return;
+        }
+        curr = curr->next;
+    }
+}
+
 t_node** generate_shortest_path_graph(t_node** nodeMatrix, uint8_t** cost, size_t rows, size_t cols) {
     t_node** unprocessedNodes = hash_table_init(nodeMatrix, rows, cols);
+    t_node* list = &nodeMatrix[0][0];
     for(size_t i = 0; i < rows * cols; i++) {
         printf("Current: %ld\n", i + 1);
-        t_node* parent = get_node_with_minimum_cost(unprocessedNodes, rows, cols);
+        t_node* parent = get_node_with_minimum_cost(list);
         hash_table_remove(unprocessedNodes, parent, cols);
+        node_list_remove(&list, parent);
         size_t movesSize = 0;
         uint32_t** moves = get_possible_moves(parent, rows, cols, &movesSize);
         for(size_t j = 0; j < movesSize; j++) {
