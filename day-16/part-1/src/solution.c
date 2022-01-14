@@ -121,14 +121,12 @@ uint64_t decode_sequence(char* binSeq) {
             offset += LENGTH_TYPE_ID_SIZE;
             printf("Length type ID: %c\n", lengthTypeID);
             size_t binSize = 0;
-            char* binAux = NULL;
             if(lengthTypeID == '0') {
                 binSize = SUBPACKETS_TOTAL_LENGTH_SIZE + 1;
-                binAux = calloc(binSize, sizeof(char));
             } else if(lengthTypeID == '1') {
                 binSize = SUBPACKETS_NUMBER_SIZE + 1;
-                binAux = calloc(binSize, sizeof(char));
             }
+            char* binAux = calloc(binSize, sizeof(char));
             memcpy(binAux, binSeq + offset, binSize);
             binAux[binSize - 1] = '\0';
             offset += binSize - 1;
