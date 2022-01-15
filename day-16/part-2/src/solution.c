@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <string.h>
+#include <gmp.h>
 
 #define HEX_BIN_SIZE 4
 #define HEADER_COMPONENT_SIZE 3
@@ -13,6 +14,7 @@
 #define LENGTH_TYPE_ID_SIZE 1
 #define SUBPACKETS_NUMBER_SIZE 11
 #define SUBPACKETS_TOTAL_LENGTH_SIZE 15
+#define BASE10 10
 
 void matrix_destroy(void** matrix, size_t dim) {
     for(size_t i = 0; i < dim; i++) {
@@ -87,7 +89,8 @@ bool is_last_packet(char* binSeq, uint64_t offset) {
 }
 
 uint64_t number_of_digits(uint64_t x) {
-    return snprintf(0, 0, "%+ld", x) - 1;
+    int ret = snprintf(0, 0, "%+ld", x) - 1;
+    return ret;
 }
 
 char* associated_symbol(uint8_t typeID) {
@@ -222,10 +225,6 @@ char* pop(char*** stack, int32_t* stackSize) {
     return elem;
 }
 
-bool is_empty_stack(char** stack) {
-    return stack == NULL;
-}
-
 uint64_t min(uint64_t a, uint64_t b) {
     return a < b ? a : b;
 }
@@ -235,26 +234,39 @@ uint64_t max(uint64_t a, uint64_t b) {
 }
 
 char* currify(char* LVal, char* operator, char* RVal) {
-    uint64_t newLVal = 0;
-    uint64_t decLVal = atoll(LVal);
-    uint64_t decRVal = atoll(RVal);
+    mpz_t newLVal;
+    mpz_t decLVal;
+    mpz_t decRVal;
+    mpz_init(newLVal);
+    mpz_init_set_str(decLVal, LVal, BASE10);
+    mpz_init_set_str(decRVal, RVal, BASE10);
     if(is_sum(operator)) {
-        newLVal = decLVal + decRVal;
+        mpz_add(newLVal, decLVal, decRVal);
     } else if(is_prod(operator)) {
-        newLVal = decLVal * decRVal;
-    } else if(is_min(operator)) {
-        newLVal = min(decLVal, decRVal);
-    } else if(is_max(operator)) {
-        newLVal = max(decLVal, decRVal);
-    } else if(is_greater(operator)) {
-        newLVal = decLVal > decRVal;
-    } else if(is_less(operator)) {
-        newLVal = decLVal < decRVal;
-    } else if(is_equal(operator)) {
-        newLVal = decLVal == decRVal;
+        mpz_mul(newLVal, decLVal, decRVal);
+    } else {
+        int cmpVal = mpz_cmp(decLVal, decRVal);
+        if(is_min(operator)) {
+            if(cmpVal < 0)  mpz_set(newLVal, decLVal);
+            else            mpz_set(newLVal, decRVal);
+        } else if(is_max(operator)) {
+            if(cmpVal > 0)  mpz_set(newLVal, decLVal);
+            else            mpz_set(newLVal, decRVal);
+        } else if(is_greater(operator)) {
+            if(cmpVal > 0)  mpz_set_str(newLVal, "1", BASE10);
+            else            mpz_set_str(newLVal, "0", BASE10);
+        } else if(is_less(operator)) {
+            if(cmpVal < 0)  mpz_set_str(newLVal, "1", BASE10);
+            else            mpz_set_str(newLVal, "0", BASE10);
+        } else if(is_equal(operator)) {
+            if(cmpVal == 0) mpz_set_str(newLVal, "1", BASE10);
+            else            mpz_set_str(newLVal, "0", BASE10);
+        }
     }
-    char* currified = calloc(number_of_digits(newLVal) + 1, sizeof(char));
-    sprintf(currified, "%ld", newLVal);
+    char* currified = mpz_get_str(NULL, BASE10, newLVal);
+    mpz_clear(newLVal);
+    mpz_clear(decLVal);
+    mpz_clear(decRVal);
     return currified;
 }
 
