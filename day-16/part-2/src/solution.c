@@ -16,6 +16,16 @@
 #define SUBPACKETS_TOTAL_LENGTH_SIZE 15
 #define BASE10 10
 
+typedef struct t_packet t_packet;
+struct t_packet {
+    uint8_t ver;
+    char* tid;
+    char* val;
+    char ltid;
+    uint64_t subPacketsSize;
+    t_packet** subPackets;
+};
+
 void matrix_destroy(void** matrix, size_t dim) {
     for(size_t i = 0; i < dim; i++) {
         free(matrix[i]);
@@ -23,17 +33,17 @@ void matrix_destroy(void** matrix, size_t dim) {
     free(matrix);
 }
 
-char* get_msg(FILE* input, size_t* msgSize) {
-    char* msg = NULL;
-    char c = '\0';
-    while((c = fgetc(input)) != EOF) {
-        msg = realloc(msg, ++(*msgSize) * sizeof(char));
-        msg[*msgSize - 1] = c;
+char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
+    char* hex = calloc(++(*hexSeqSize), sizeof(char));
+    char c = fgetc(input);
+    while(c != EOF && c != '\n') {
+        hex[*hexSeqSize - 1] = c;
+        hex = realloc(hex, ++(*hexSeqSize) * sizeof(char));
+        c = fgetc(input);
     }
-    msg = realloc(msg, ++(*msgSize) * sizeof(char));
-    msg[*msgSize - 1] = '\0';
+    hex[*hexSeqSize - 1] = '\0';
     rewind(input);
-    return msg;
+    return hex;
 }
 
 char* hex_to_bin(char hex) {
@@ -58,8 +68,7 @@ char* hex_to_bin(char hex) {
     return NULL;
 }
 
-char* hexSeq_to_binSeq(char* hexSeq, size_t hexSeqSize) {
-    size_t binSeqSize = HEX_BIN_SIZE * (hexSeqSize - 1) + 1;
+char* hexSeq_to_binSeq(char* hexSeq, size_t binSeqSize) {
     char* binSeq = calloc(binSeqSize, sizeof(char));
     size_t i = 0;
     while(hexSeq[i]) {
@@ -70,7 +79,7 @@ char* hexSeq_to_binSeq(char* hexSeq, size_t hexSeqSize) {
     return binSeq;
 }
 
-uint64_t bin_to_dec(char* bin /* null terminated */) {
+uint64_t bin_to_dec(char* bin /* must be null terminated */) {
     uint64_t dec = 0;
     size_t i = 0;
     while(bin[i]) {
@@ -93,104 +102,6 @@ uint64_t number_of_digits(uint64_t x) {
     return ret;
 }
 
-char* associated_symbol(uint8_t typeID) {
-    switch(typeID) {
-        case 0: return "+";
-        case 1: return "*";
-        case 2: return "min";
-        case 3: return "max";
-        case 5: return ">";
-        case 6: return "<";
-        case 7: return "==";
-    }
-    return NULL;
-}
-
-char** preorder_gen(char* binSeq, size_t* preorderSize) {
-    char* version = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
-    char* typeIDBin = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
-    version[HEADER_COMPONENT_SIZE] = '\0';
-    typeIDBin[HEADER_COMPONENT_SIZE] = '\0';
-    uint64_t offset = 0;
-
-    char** preorder = NULL;
-    char* preorderElem = NULL;
-
-    do {
-        preorder = realloc(preorder, ++(*preorderSize) * sizeof(char*));
-
-        printf("\n");
-        memcpy(version, binSeq + offset, HEADER_COMPONENT_SIZE);
-        offset += HEADER_COMPONENT_SIZE;
-        printf("Version: %ld\n", bin_to_dec(version));
-        memcpy(typeIDBin, binSeq + offset, HEADER_COMPONENT_SIZE);
-        offset += HEADER_COMPONENT_SIZE;
-
-        uint8_t typeIDDec = bin_to_dec(typeIDBin);
-        printf("Type ID: %d\n", typeIDDec);
-
-        if(typeIDDec == LITERAL_PACKET) {
-            uint64_t valueInBinSize = LITERAL_GROUP_SIZE + 1;
-            char* valueInBin = calloc(valueInBinSize, sizeof(char));
-
-            uint64_t literalValue = 0;
-            bool literalsEnd = false;
-
-            while(!literalsEnd) {
-                char prefix = binSeq[offset];
-                offset += PREFIX_SIZE;
-                strncat(valueInBin, binSeq + offset, LITERAL_GROUP_SIZE);
-                offset += LITERAL_GROUP_SIZE;
-                if(prefix == '0') {
-                    valueInBin[valueInBinSize - 1] = '\0';
-                    literalValue = bin_to_dec(valueInBin);
-                    printf("Literal value: %ld\n", literalValue);
-                    uint64_t preorderElemSize = number_of_digits(literalValue) + 1;
-                    printf("PreorderElemSize: %ld\n", preorderElemSize);
-                    preorderElem = realloc(preorderElem, preorderElemSize);
-                    sprintf(preorderElem, "%ld", literalValue);
-                    preorderElem[preorderElemSize - 1] = '\0';
-                    literalsEnd = true;
-                } else if(prefix == '1') {
-                    valueInBinSize += LITERAL_GROUP_SIZE;
-                    valueInBin = realloc(valueInBin, valueInBinSize);
-                }
-            }
-            free(valueInBin);
-        } else {
-            char lengthTypeID = binSeq[offset];
-            offset += LENGTH_TYPE_ID_SIZE;
-            printf("Length type ID: %c\n", lengthTypeID);
-
-            uint64_t binSize = 0;
-            if(lengthTypeID == '0') {
-                binSize = SUBPACKETS_TOTAL_LENGTH_SIZE + 1;
-            } else if(lengthTypeID == '1') {
-                binSize = SUBPACKETS_NUMBER_SIZE + 1;
-            }
-            char* binAux = calloc(binSize, sizeof(char));
-            memcpy(binAux, binSeq + offset, binSize - 1);
-            binAux[binSize - 1] = '\0';
-            offset += binSize - 1;
-            uint64_t dec = bin_to_dec(binAux);
-            printf("Value: %ld\n", dec);
-            free(binAux);
-
-            uint8_t typeIDDec = bin_to_dec(typeIDBin);
-            char* associatedSymbol = associated_symbol(typeIDDec);
-            printf("Associated symbol: %s | Size: %ld\n", associatedSymbol, strlen(associatedSymbol) + 1);
-            preorderElem = strdup(associatedSymbol);
-        }
-
-        preorder[*preorderSize - 1] = preorderElem;
-        preorderElem = NULL;
-
-    } while(!is_last_packet(binSeq, offset));
-    free(version);
-    free(typeIDBin);
-    return preorder;
-}
-
 void expression_print(char** expression, size_t size) {
     printf("[");
     for(size_t i = 0; i < size; i++) {
@@ -211,12 +122,12 @@ bool is_operator(char* str) {
     return is_sum(str) || is_prod(str) || is_min(str) || is_max(str) || is_greater(str) || is_less(str) || is_equal(str);
 }
 
-void push(char*** stack, int32_t* stackSize, char* elem) {
+void push(char*** stack, uint32_t* stackSize, char* elem) {
     *stack = realloc(*stack, ++(*stackSize) * sizeof(char*));
     (*stack)[*stackSize - 1] = strdup(elem);
 }
 
-char* pop(char*** stack, int32_t* stackSize) {
+char* pop(char*** stack, uint32_t* stackSize) {
     char* elem = (*stack)[*stackSize - 1];
     *stack = realloc(*stack, --(*stackSize) * sizeof(char*));
     if(*stackSize == 0) {
@@ -270,77 +181,184 @@ char* currify(char* LVal, char* operator, char* RVal) {
     return currified;
 }
 
-uint64_t expression_eval(char** preorder, size_t preorderSize) {
-    char** stack = NULL;
-    int32_t stackSize = 0;
-    int32_t i = preorderSize - 1;
-    int32_t pushedLiterals = 0;
-    expression_print(stack, stackSize);
-    while(i >= 0) {
-        if(is_operator(preorder[i])) {
-            char* currified = NULL;
-            char* LVal = NULL;
-            char* RVal = NULL;
-            if(pushedLiterals) {
-                bool stop = false;
-                while(!stop) {
-                    LVal = pop(&stack, &stackSize);
-                    pushedLiterals--;
-                    if(pushedLiterals >= 1) {
-                        RVal = pop(&stack, &stackSize);
-                        pushedLiterals--;
-                        currified = currify(LVal, preorder[i], RVal);
-                        free(LVal);
-                        free(RVal);
-                        pushedLiterals++;
-                    } else {
-                        currified = LVal;
-                        stop = true;
-                    }
-                    push(&stack, &stackSize, currified);
-                    free(currified);
-                    expression_print(stack, stackSize);
-                }
-                pushedLiterals = 1;
-            } else if(i == 0) {
-                while(stackSize > 1) {
-                    LVal = pop(&stack, &stackSize);
-                    RVal = pop(&stack, &stackSize);
-                    currified = currify(LVal, preorder[i], RVal);
-                    push(&stack, &stackSize, currified);
-                    free(LVal);
-                    free(RVal);
-                    free(currified);
-                    expression_print(stack, stackSize);
-                }
-            }
-        } else {
-            push(&stack, &stackSize, preorder[i]);
-            pushedLiterals++;
-            expression_print(stack, stackSize);
-        }
-        i--;
+char* associated_symbol(uint8_t typeID) {
+    switch(typeID) {
+        case 0: return "sum";
+        case 1: return "prod";
+        case 2: return "min";
+        case 3: return "max";
+        case 4: return "literal";
+        case 5: return "greater";
+        case 6: return "less";
+        case 7: return "equal";
     }
-    uint64_t eval = atoll(stack[0]);
-    matrix_destroy((void**) stack, 1);
-    return eval;
+    return NULL;
+}
+
+t_packet* packet_create(uint8_t ver, uint8_t tid, char* val, char ltid) {
+    t_packet* self = malloc(sizeof(t_packet));
+    self->ver = ver;
+    self->tid = associated_symbol(tid); /* no need to free */
+    self->val = val;
+    self->ltid = ltid;
+    self->subPacketsSize = 0;
+    self->subPackets = NULL;
+    return self;
+}
+
+t_packet* decode_packet(char* binSeq, size_t* offset) {
+    char* versionStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
+    char* typeIDStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
+    versionStr[HEADER_COMPONENT_SIZE] = '\0';
+    typeIDStr[HEADER_COMPONENT_SIZE] = '\0';
+
+    memcpy(versionStr, binSeq + *offset, HEADER_COMPONENT_SIZE);
+    *offset += HEADER_COMPONENT_SIZE;
+    memcpy(typeIDStr, binSeq + *offset, HEADER_COMPONENT_SIZE);
+    *offset += HEADER_COMPONENT_SIZE;
+
+    uint64_t value = 0;
+    uint8_t version = bin_to_dec(versionStr);
+    uint8_t typeID = bin_to_dec(typeIDStr);
+    char ltid = '\0';
+
+    if(typeID == LITERAL_PACKET) {
+        uint64_t valueInBinSize = LITERAL_GROUP_SIZE + 1;
+        char* valueInBin = calloc(valueInBinSize, sizeof(char));
+        bool literalsEnd = false;
+        while(!literalsEnd) {
+            char prefix = binSeq[*offset];
+            *offset += PREFIX_SIZE;
+            strncat(valueInBin, binSeq + *offset, LITERAL_GROUP_SIZE);
+            *offset += LITERAL_GROUP_SIZE;
+            if(prefix == '0') {
+                valueInBin[valueInBinSize - 1] = '\0';
+                value = bin_to_dec(valueInBin);
+                ltid = '-';
+                literalsEnd = true;
+            } else if(prefix == '1') {
+                valueInBinSize += LITERAL_GROUP_SIZE;
+                valueInBin = realloc(valueInBin, valueInBinSize);
+            }
+        }
+        free(valueInBin);
+    } else {
+        ltid = binSeq[*offset];
+        *offset += LENGTH_TYPE_ID_SIZE;
+        uint64_t binSize = 0;
+        if(ltid == '0') {
+            binSize = SUBPACKETS_TOTAL_LENGTH_SIZE + 1;
+        } else if(ltid == '1') {
+            binSize = SUBPACKETS_NUMBER_SIZE + 1;
+        }
+        char* binAux = calloc(binSize, sizeof(char));
+        memcpy(binAux, binSeq + *offset, binSize - 1);
+        binAux[binSize - 1] = '\0';
+        *offset += binSize - 1;
+        value = bin_to_dec(binAux);
+        free(binAux);
+    }
+    char* val = calloc(number_of_digits(value) + 1, sizeof(char));
+    sprintf(val, "%ld", value);
+
+    free(versionStr);
+    free(typeIDStr);
+
+    return packet_create(version, typeID, val, ltid);
+}
+
+bool is_literal_packet(t_packet* packet) {
+    return strcmp(packet->tid, "literal") == 0;
+}
+
+bool all_subpackets_decoded(t_packet* parent, uint64_t processedSubPackets, uint64_t processedLength) {
+    bool val = false;
+    if(!is_literal_packet(parent)) {                            /* is operator packet */
+        if(parent->ltid == '0') {                               /* total length in bits */
+            val = processedLength >= atoi(parent->val);
+        } else if(parent->ltid == '1') {                        /* number of sub-packets immediately contained */
+            val = processedSubPackets >= atoi(parent->val);
+        }
+    }
+    return val;
+}
+
+t_packet* decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t processedSubPackets, uint64_t* processedLength) {
+    while(!all_subpackets_decoded(parent, processedSubPackets, *processedLength)) {
+        size_t initialOffset = *offset;
+        t_packet* child = decode_packet(binSeq, offset);
+        size_t finalOffset = *offset;
+        size_t diffOffset = finalOffset - initialOffset;
+        *processedLength += diffOffset;
+        processedSubPackets++;
+        if(!is_literal_packet(child)) {
+            uint64_t childProcessedLength = 0;
+            uint64_t childProcessedSubPackets = 0;
+            child = decode_subpackets(child, binSeq, offset, childProcessedSubPackets, &childProcessedLength);
+            *processedLength += childProcessedLength;
+            processedSubPackets += childProcessedSubPackets;
+        }
+        parent->subPackets = realloc(parent->subPackets, ++(parent->subPacketsSize) * sizeof(t_packet*));
+        (parent->subPackets)[parent->subPacketsSize - 1] = child;
+    }
+    return parent;
+}
+
+void ast_print(t_packet* packet, uint32_t depth) {
+    for(size_t i = 0; i < depth; i++) {
+        printf("  ");
+    }
+    printf("<Packet ver: %d, tid: %s, ltid: %c, val: %s, subpsize: %ld>\n", packet->ver, packet->tid, packet->ltid, packet->val, packet->subPacketsSize);
+    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+        ast_print(packet->subPackets[i], depth + 1);
+    }
+}
+
+/*
+struct t_packet {
+    uint8_t ver;
+    char* tid;
+    char* val;
+    char ltid;
+    uint64_t subPacketsSize;
+    t_packet* subPackets;
+};
+*/
+
+void packet_destroy(t_packet* self) {
+    free(self->subPackets);
+    free(self->val);
+    free(self);
+}
+
+void ast_destroy(t_packet* packet) {
+    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+        ast_destroy(packet->subPackets[i]);
+    }
+    packet_destroy(packet);
 }
 
 uint64_t solution(FILE* input) {
     size_t hexSeqSize = 0;
-    char* hexSeq = get_msg(input, &hexSeqSize);
+    char* hexSeq = get_hexSeq(input, &hexSeqSize);
+    size_t binSeqSize = HEX_BIN_SIZE * (hexSeqSize - 1) + 1;
+    char* binSeq = hexSeq_to_binSeq(hexSeq, binSeqSize);
     printf("Hex: %s\n", hexSeq);
-    char* binSeq = hexSeq_to_binSeq(hexSeq, hexSeqSize);
     printf("Binary: %s\n", binSeq);
-    size_t preorderSize = 0;
-    char** preorder = preorder_gen(binSeq, &preorderSize);
-    printf("\n");
-    expression_print(preorder, preorderSize);
-    uint64_t eval = expression_eval(preorder, preorderSize);
+
+    size_t offset = 0;
+    t_packet* outer = decode_packet(binSeq, &offset);
+    uint64_t processedSubPackets = 0;
+    uint64_t processedLength = 0;
+    outer = decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength);
+
+    uint32_t depth = 0;
+    ast_print(outer, depth);
+
     free(hexSeq);
     free(binSeq);
-    matrix_destroy((void**) preorder, preorderSize);
-    return eval;
+    ast_destroy(outer);
+    return 0;
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
