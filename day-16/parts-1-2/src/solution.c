@@ -208,7 +208,7 @@ char* currify(char* LVal, uint8_t operator, char* RVal) {
     return currified;
 }
 
-t_packet* decode_packet(char* binSeq, size_t* offset) {
+t_packet* decode_packet(char* binSeq, size_t* offset, uint64_t* versionSum) {
     char* versionStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
     char* typeIDStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
     versionStr[HEADER_COMPONENT_SIZE] = '\0';
@@ -223,6 +223,8 @@ t_packet* decode_packet(char* binSeq, size_t* offset) {
     uint8_t version = bin_to_dec(versionStr);
     uint8_t typeID = bin_to_dec(typeIDStr);
     char ltid = '\0';
+
+    *versionSum += version;
 
     if(is_literal(typeID)) {
         uint64_t valueInBinSize = LITERAL_GROUP_SIZE + 1;
@@ -269,10 +271,10 @@ t_packet* decode_packet(char* binSeq, size_t* offset) {
     return packet_create(version, typeID, val, ltid);
 }
 
-void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t processedSubPackets, uint64_t* processedLength) {
+void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t processedSubPackets, uint64_t* processedLength, uint64_t* versionSum) {
     while(!all_subpackets_decoded(parent, processedSubPackets, *processedLength)) {
         size_t initialOffset = *offset;
-        t_packet* child = decode_packet(binSeq, offset);
+        t_packet* child = decode_packet(binSeq, offset, versionSum);
         size_t finalOffset = *offset;
         size_t diffOffset = finalOffset - initialOffset;
         *processedLength += diffOffset;
@@ -280,7 +282,7 @@ void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t 
         if(!is_literal(child->tid)) {
             uint64_t childProcessedLength = 0;
             uint64_t childProcessedSubPackets = 0;
-            decode_subpackets(child, binSeq, offset, childProcessedSubPackets, &childProcessedLength);
+            decode_subpackets(child, binSeq, offset, childProcessedSubPackets, &childProcessedLength, versionSum);
             *processedLength += childProcessedLength;
             processedSubPackets += childProcessedSubPackets;
         }
@@ -359,11 +361,12 @@ uint64_t solution(FILE* input) {
     printf("Hex: %s\n\n", hexSeq);
     printf("Binary: %s\n\n", binSeq);
 
+    uint64_t versionSum = 0;
     size_t offset = 0;
-    t_packet* outer = decode_packet(binSeq, &offset);
+    t_packet* outer = decode_packet(binSeq, &offset, &versionSum);
     uint64_t processedSubPackets = 0;
     uint64_t processedLength = 0;
-    decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength);
+    decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength, &versionSum);
 
     uint32_t depth = 0;
     printf("Before eval:\n");
@@ -381,6 +384,8 @@ uint64_t solution(FILE* input) {
     free(hexSeq);
     free(binSeq);
     ast_destroy(outer);
+
+    printf("Version sum: %ld\n", versionSum);
     return eval;
 }
 
