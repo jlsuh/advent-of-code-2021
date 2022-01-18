@@ -6,45 +6,90 @@
 #include <string.h>
 #include <gmp.h>
 
-#define HEX_BIN_SIZE 4
-#define HEADER_COMPONENT_SIZE 3
-#define LITERAL_GROUP_SIZE 4
-#define LITERAL_PACKET 4
-#define PREFIX_SIZE 1
+void _(void) {
+    char* _[] = {
+        "⠀     ⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⡄",
+        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠛⣿⣟⣛⣃⡀",
+        "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⠿⠿⠟",
+        "⠀⠀⠀⣀⣀⣀⣀⣀⣀⣀⣶⠿⢿⣆⣀⣀⣀⣀",
+        " ⢠⡾⠋⠉⠉⠉⠉⠉⠉⠉  ⠉⠉⠉⠉⠉⠛⠛⢦⡀",
+        " ⢸⡇      COPIUM         ⢸⡇",
+        " ⢸⡇                      ⣷",
+        " ⣸⡆                       ⣟",
+        " ⣿⡇                        ⣿",
+        " ⢻⡇                        ⢸⡏",
+        " ⢸⡇                        ⣿",
+        " ⢸⡇40Liters               ⣷",
+        " ⠘⢷⣄⣀⣀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⣀⡀⡀⢀⣿",
+        " ⠀⠀⠀⠀⠉⠉⠉⠉⠙⠛⠛⠛⠛⠛⠛⠛⠋⠉⠉⠉⠁"
+    };
+    for(int i = 0; i < 14; i++) {
+        printf("%s\n", _[i]);
+    }
+}
+
 #define LENGTH_TYPE_ID_SIZE 1
+#define PREFIX_SIZE 1
+#define HEADER_COMPONENT_SIZE 3
+#define HEX_BIN_SIZE 4
+#define LITERAL_GROUP_SIZE 4
+#define BASE10 10
 #define SUBPACKETS_NUMBER_SIZE 11
 #define SUBPACKETS_TOTAL_LENGTH_SIZE 15
-#define BASE10 10
+
+typedef enum {
+    SUM,
+    PRODUCT,
+    MINIMUM,
+    MAXIMUM,
+    LITERAL,
+    GREATER_THAN,
+    LESS_THAN,
+    EQUAL_TO
+} t_packet_type;
 
 typedef struct t_packet t_packet;
 struct t_packet {
     uint8_t ver;
-    char* tid;
+    uint8_t tid;
+    char* currified;
     char* val;
     char ltid;
     uint64_t subPacketsSize;
     t_packet** subPackets;
 };
 
-void matrix_destroy(void** matrix, size_t dim) {
-    for(size_t i = 0; i < dim; i++) {
-        free(matrix[i]);
-    }
-    free(matrix);
+bool is_sum(t_packet_type tid) { return tid == SUM; }
+bool is_prod(t_packet_type tid) { return tid == PRODUCT; }
+bool is_min(t_packet_type tid) { return tid == MINIMUM; }
+bool is_max(t_packet_type tid) { return tid == MAXIMUM; }
+bool is_literal(t_packet_type tid) { return tid == LITERAL; }
+bool is_greater(t_packet_type tid) { return tid == GREATER_THAN; }
+bool is_less(t_packet_type tid) { return tid == LESS_THAN; }
+bool is_equal(t_packet_type tid) { return tid == EQUAL_TO; }
+bool is_operator(t_packet_type tid) {
+    return is_sum(tid) || is_prod(tid) || is_min(tid) || is_max(tid) || is_greater(tid) || is_less(tid) || is_equal(tid);
 }
 
-char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
-    char* hex = calloc(++(*hexSeqSize), sizeof(char));
-    char c = fgetc(input);
-    while(c != EOF && c != '\n') {
-        hex[*hexSeqSize - 1] = c;
-        hex = realloc(hex, ++(*hexSeqSize) * sizeof(char));
-        c = fgetc(input);
+bool is_total_length_ltid(char ltid) { return ltid == '0'; }
+bool is_number_of_subpackets_ltid(char ltid) { return ltid == '1'; }
+
+bool all_subpackets_decoded(t_packet* parent, uint64_t processedSubPackets, uint64_t processedLength) {
+    bool val = false;
+    if(!is_literal(parent->tid)) {
+        if(is_total_length_ltid(parent->ltid)) {                    /* total length in bits                         */
+            val = processedLength >= atoi(parent->val);
+        } else if(is_number_of_subpackets_ltid(parent->ltid)) {     /* number of sub-packets immediately contained  */
+            val = processedSubPackets >= atoi(parent->val);
+        }
     }
-    hex[*hexSeqSize - 1] = '\0';
-    rewind(input);
-    return hex;
+    return val;
 }
+
+uint64_t number_of_digits(uint64_t x) { return snprintf(0, 0, "%+ld", x) - 1; }
+
+uint64_t min(uint64_t a, uint64_t b) { return a < b ? a : b; }
+uint64_t max(uint64_t a, uint64_t b) { return a > b ? a : b; }
 
 char* hex_to_bin(char hex) {
     switch(hex) {
@@ -68,17 +113,6 @@ char* hex_to_bin(char hex) {
     return NULL;
 }
 
-char* hexSeq_to_binSeq(char* hexSeq, size_t binSeqSize) {
-    char* binSeq = calloc(binSeqSize, sizeof(char));
-    size_t i = 0;
-    while(hexSeq[i]) {
-        strcat(binSeq, hex_to_bin(hexSeq[i]));
-        i++;
-    }
-    binSeq[binSeqSize - 1] = '\0';
-    return binSeq;
-}
-
 uint64_t bin_to_dec(char* bin /* must be null terminated */) {
     uint64_t dec = 0;
     size_t i = 0;
@@ -90,61 +124,54 @@ uint64_t bin_to_dec(char* bin /* must be null terminated */) {
     return dec;
 }
 
-bool is_last_packet(char* binSeq, uint64_t offset) {
-    for(size_t i = offset; binSeq[i]; i++) {
-        if(binSeq[i] == '1') return false;
+char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
+    char* hex = calloc(++(*hexSeqSize), sizeof(char));
+    char c = fgetc(input);
+    while(c != EOF && c != '\n') {
+        hex[*hexSeqSize - 1] = c;
+        hex = realloc(hex, ++(*hexSeqSize) * sizeof(char));
+        c = fgetc(input);
     }
-    return true;
+    hex[*hexSeqSize - 1] = '\0';
+    rewind(input);
+    return hex;
 }
 
-uint64_t number_of_digits(uint64_t x) {
-    int ret = snprintf(0, 0, "%+ld", x) - 1;
-    return ret;
-}
-
-void expression_print(char** expression, size_t size) {
-    printf("[");
-    for(size_t i = 0; i < size; i++) {
-        if(i == size - 1) printf("%s", expression[i]);
-        else printf("%s, ", expression[i]);
+char* hexSeq_to_binSeq(char* hexSeq, size_t binSeqSize) {
+    char* binSeq = calloc(binSeqSize, sizeof(char));
+    size_t i = 0;
+    while(hexSeq[i]) {
+        strcat(binSeq, hex_to_bin(hexSeq[i]));
+        i++;
     }
-    printf("]\n");
+    binSeq[binSeqSize - 1] = '\0';
+    return binSeq;
 }
 
-bool is_sum(char* str) { return strcmp(str, "+") == 0; }
-bool is_prod(char* str) { return strcmp(str, "*") == 0; }
-bool is_min(char* str) { return strcmp(str, "min") == 0; }
-bool is_max(char* str) { return strcmp(str, "max") == 0; }
-bool is_greater(char* str) { return strcmp(str, ">") == 0; }
-bool is_less(char* str) { return strcmp(str, "<") == 0; }
-bool is_equal(char* str) { return strcmp(str, "==") == 0; }
-bool is_operator(char* str) {
-    return is_sum(str) || is_prod(str) || is_min(str) || is_max(str) || is_greater(str) || is_less(str) || is_equal(str);
+void packet_destroy(t_packet* self) {
+    free(self->subPackets);
+    free(self->val);
+    free(self->currified);
+    free(self);
 }
 
-void push(char*** stack, uint32_t* stackSize, char* elem) {
-    *stack = realloc(*stack, ++(*stackSize) * sizeof(char*));
-    (*stack)[*stackSize - 1] = strdup(elem);
-}
-
-char* pop(char*** stack, uint32_t* stackSize) {
-    char* elem = (*stack)[*stackSize - 1];
-    *stack = realloc(*stack, --(*stackSize) * sizeof(char*));
-    if(*stackSize == 0) {
-        *stack = NULL;
+t_packet* packet_create(uint8_t ver, uint8_t tid, char* val, char ltid) {
+    t_packet* self = malloc(sizeof(t_packet));
+    self->ver = ver;
+    self->tid = tid;
+    self->val = val;
+    self->ltid = ltid;
+    self->subPacketsSize = 0;
+    self->subPackets = NULL;
+    if(!is_literal(self->tid)) {
+        self->currified = NULL;
+    } else {
+        self->currified = strdup(val);
     }
-    return elem;
+    return self;
 }
 
-uint64_t min(uint64_t a, uint64_t b) {
-    return a < b ? a : b;
-}
-
-uint64_t max(uint64_t a, uint64_t b) {
-    return a > b ? a : b;
-}
-
-char* currify(char* LVal, char* operator, char* RVal) {
+char* currify(char* LVal, uint8_t operator, char* RVal) {
     mpz_t newLVal;
     mpz_t decLVal;
     mpz_t decRVal;
@@ -181,31 +208,6 @@ char* currify(char* LVal, char* operator, char* RVal) {
     return currified;
 }
 
-char* associated_symbol(uint8_t typeID) {
-    switch(typeID) {
-        case 0: return "sum";
-        case 1: return "prod";
-        case 2: return "min";
-        case 3: return "max";
-        case 4: return "literal";
-        case 5: return "greater";
-        case 6: return "less";
-        case 7: return "equal";
-    }
-    return NULL;
-}
-
-t_packet* packet_create(uint8_t ver, uint8_t tid, char* val, char ltid) {
-    t_packet* self = malloc(sizeof(t_packet));
-    self->ver = ver;
-    self->tid = associated_symbol(tid); /* no need to free */
-    self->val = val;
-    self->ltid = ltid;
-    self->subPacketsSize = 0;
-    self->subPackets = NULL;
-    return self;
-}
-
 t_packet* decode_packet(char* binSeq, size_t* offset) {
     char* versionStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
     char* typeIDStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
@@ -222,7 +224,7 @@ t_packet* decode_packet(char* binSeq, size_t* offset) {
     uint8_t typeID = bin_to_dec(typeIDStr);
     char ltid = '\0';
 
-    if(typeID == LITERAL_PACKET) {
+    if(is_literal(typeID)) {
         uint64_t valueInBinSize = LITERAL_GROUP_SIZE + 1;
         char* valueInBin = calloc(valueInBinSize, sizeof(char));
         bool literalsEnd = false;
@@ -246,9 +248,9 @@ t_packet* decode_packet(char* binSeq, size_t* offset) {
         ltid = binSeq[*offset];
         *offset += LENGTH_TYPE_ID_SIZE;
         uint64_t binSize = 0;
-        if(ltid == '0') {
+        if(is_total_length_ltid(ltid)) {
             binSize = SUBPACKETS_TOTAL_LENGTH_SIZE + 1;
-        } else if(ltid == '1') {
+        } else if(is_number_of_subpackets_ltid(ltid)) {
             binSize = SUBPACKETS_NUMBER_SIZE + 1;
         }
         char* binAux = calloc(binSize, sizeof(char));
@@ -267,23 +269,7 @@ t_packet* decode_packet(char* binSeq, size_t* offset) {
     return packet_create(version, typeID, val, ltid);
 }
 
-bool is_literal_packet(t_packet* packet) {
-    return strcmp(packet->tid, "literal") == 0;
-}
-
-bool all_subpackets_decoded(t_packet* parent, uint64_t processedSubPackets, uint64_t processedLength) {
-    bool val = false;
-    if(!is_literal_packet(parent)) {                            /* is operator packet */
-        if(parent->ltid == '0') {                               /* total length in bits */
-            val = processedLength >= atoi(parent->val);
-        } else if(parent->ltid == '1') {                        /* number of sub-packets immediately contained */
-            val = processedSubPackets >= atoi(parent->val);
-        }
-    }
-    return val;
-}
-
-t_packet* decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t processedSubPackets, uint64_t* processedLength) {
+void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t processedSubPackets, uint64_t* processedLength) {
     while(!all_subpackets_decoded(parent, processedSubPackets, *processedLength)) {
         size_t initialOffset = *offset;
         t_packet* child = decode_packet(binSeq, offset);
@@ -291,44 +277,48 @@ t_packet* decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint
         size_t diffOffset = finalOffset - initialOffset;
         *processedLength += diffOffset;
         processedSubPackets++;
-        if(!is_literal_packet(child)) {
+        if(!is_literal(child->tid)) {
             uint64_t childProcessedLength = 0;
             uint64_t childProcessedSubPackets = 0;
-            child = decode_subpackets(child, binSeq, offset, childProcessedSubPackets, &childProcessedLength);
+            decode_subpackets(child, binSeq, offset, childProcessedSubPackets, &childProcessedLength);
             *processedLength += childProcessedLength;
             processedSubPackets += childProcessedSubPackets;
         }
         parent->subPackets = realloc(parent->subPackets, ++(parent->subPacketsSize) * sizeof(t_packet*));
         (parent->subPackets)[parent->subPacketsSize - 1] = child;
     }
-    return parent;
+}
+
+void push(char*** stack, uint32_t* stackSize, char* elem) {
+    *stack = realloc(*stack, ++(*stackSize) * sizeof(char*));
+    (*stack)[*stackSize - 1] = strdup(elem);
+}
+
+char* pop(char*** stack, uint32_t* stackSize) {
+    char* elem = (*stack)[*stackSize - 1];
+    *stack = realloc(*stack, --(*stackSize) * sizeof(char*));
+    if(*stackSize == 0) {
+        *stack = NULL;
+    }
+    return elem;
 }
 
 void ast_print(t_packet* packet, uint32_t depth) {
     for(size_t i = 0; i < depth; i++) {
         printf("  ");
     }
-    printf("<Packet ver: %d, tid: %s, ltid: %c, val: %s, subpsize: %ld>\n", packet->ver, packet->tid, packet->ltid, packet->val, packet->subPacketsSize);
+    printf(
+        "<Packet ver: %d, tid: %d, ltid: %c, val: %s, subpsize: %ld, currified: %s>\n",
+        packet->ver,
+        packet->tid,
+        packet->ltid,
+        packet->val,
+        packet->subPacketsSize,
+        packet->currified
+    );
     for(size_t i = 0; i < packet->subPacketsSize; i++) {
         ast_print(packet->subPackets[i], depth + 1);
     }
-}
-
-/*
-struct t_packet {
-    uint8_t ver;
-    char* tid;
-    char* val;
-    char ltid;
-    uint64_t subPacketsSize;
-    t_packet* subPackets;
-};
-*/
-
-void packet_destroy(t_packet* self) {
-    free(self->subPackets);
-    free(self->val);
-    free(self);
 }
 
 void ast_destroy(t_packet* packet) {
@@ -338,27 +328,60 @@ void ast_destroy(t_packet* packet) {
     packet_destroy(packet);
 }
 
+void ast_eval(t_packet* packet) {
+    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+        if(!is_literal(packet->subPackets[i]->tid)) {
+            ast_eval(packet->subPackets[i]);
+        }
+    }
+    uint32_t stackSize = 0;
+    char** stack = NULL;
+    for(size_t i = packet->subPacketsSize; i > 0; i--) {
+        push(&stack, &stackSize, packet->subPackets[i - 1]->currified);
+    }
+    while(stackSize > 1) {
+        char* LVal = pop(&stack, &stackSize);
+        char* RVal = pop(&stack, &stackSize);
+        char* currified = currify(LVal, packet->tid, RVal);
+        push(&stack, &stackSize, currified);
+        free(LVal);
+        free(RVal);
+        free(currified);
+    }
+    packet->currified = pop(&stack, &stackSize);
+}
+
 uint64_t solution(FILE* input) {
     size_t hexSeqSize = 0;
     char* hexSeq = get_hexSeq(input, &hexSeqSize);
     size_t binSeqSize = HEX_BIN_SIZE * (hexSeqSize - 1) + 1;
     char* binSeq = hexSeq_to_binSeq(hexSeq, binSeqSize);
-    printf("Hex: %s\n", hexSeq);
-    printf("Binary: %s\n", binSeq);
+    printf("Hex: %s\n\n", hexSeq);
+    printf("Binary: %s\n\n", binSeq);
 
     size_t offset = 0;
     t_packet* outer = decode_packet(binSeq, &offset);
     uint64_t processedSubPackets = 0;
     uint64_t processedLength = 0;
-    outer = decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength);
+    decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength);
 
     uint32_t depth = 0;
+    printf("Before eval:\n");
     ast_print(outer, depth);
+    printf("\n==================================================================================================\n\n");
+
+    ast_eval(outer);
+
+    printf("After eval:\n");
+    ast_print(outer, depth);
+    printf("\n");
+
+    uint64_t eval = atoll(outer->currified);
 
     free(hexSeq);
     free(binSeq);
     ast_destroy(outer);
-    return 0;
+    return eval;
 }
 
 int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
@@ -371,5 +394,6 @@ int main(int argc, char *argv[] /*ARGS="../input.txt"*/) {
         printf("Answer: %ld\n", answer);
     }
     fclose(input);
+    _();
     return 0;
 }
