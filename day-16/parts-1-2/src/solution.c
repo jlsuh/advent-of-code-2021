@@ -6,7 +6,7 @@
 #include <gmp.h>
 
 void _(void) {
-    char* _[] = {
+    char const * _[] = {
         "⠀     ⠀⠀⠀⠀⠀⣀⣠⣤⣤⣤⡄",
         "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠛⠛⣿⣟⣛⣃⡀",
         "⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⣿⠿⠿⠟",
@@ -87,26 +87,24 @@ bool all_subpackets_decoded(t_packet* parent, uint64_t processedSubPackets, uint
 
 uint64_t number_of_digits(uint64_t x) { return snprintf(0, 0, "%+ld", x) - 1; }
 
-char* hex_to_bin(char hex) {
-    switch(hex) {
-        case '0': return "0000";
-        case '1': return "0001";
-        case '2': return "0010";
-        case '3': return "0011";
-        case '4': return "0100";
-        case '5': return "0101";
-        case '6': return "0110";
-        case '7': return "0111";
-        case '8': return "1000";
-        case '9': return "1001";
-        case 'A': return "1010";
-        case 'B': return "1011";
-        case 'C': return "1100";
-        case 'D': return "1101";
-        case 'E': return "1110";
-        case 'F': return "1111";
-    }
-    return NULL;
+const char* hex_to_bin(char hex) {
+    return hex == '0' ? "0000"
+         : hex == '1' ? "0001"
+         : hex == '2' ? "0010"
+         : hex == '3' ? "0011"
+         : hex == '4' ? "0100"
+         : hex == '5' ? "0101"
+         : hex == '6' ? "0110"
+         : hex == '7' ? "0111"
+         : hex == '8' ? "1000"
+         : hex == '9' ? "1001"
+         : hex == 'A' ? "1010"
+         : hex == 'B' ? "1011"
+         : hex == 'C' ? "1100"
+         : hex == 'D' ? "1101"
+         : hex == 'E' ? "1110"
+         : hex == 'F' ? "1111"
+         : NULL;
 }
 
 uint64_t bin_to_dec(char* bin /* must be null terminated */) {
@@ -121,11 +119,12 @@ uint64_t bin_to_dec(char* bin /* must be null terminated */) {
 }
 
 char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
-    char* hex = calloc(++(*hexSeqSize), sizeof(char));
+    char* hex = calloc(++(*hexSeqSize), sizeof(*hex));
     char c = fgetc(input);
     while(c != EOF && c != '\n') {
         hex[*hexSeqSize - 1] = c;
-        hex = realloc(hex, ++(*hexSeqSize) * sizeof(char));
+        *hexSeqSize += 1;
+        hex = realloc(hex, *hexSeqSize * sizeof(*hex));
         c = fgetc(input);
     }
     hex[*hexSeqSize - 1] = '\0';
@@ -134,7 +133,7 @@ char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
 }
 
 char* hexSeq_to_binSeq(char* hexSeq, size_t binSeqSize) {
-    char* binSeq = calloc(binSeqSize, sizeof(char));
+    char* binSeq = calloc(binSeqSize, sizeof(*binSeq));
     size_t i = 0;
     while(hexSeq[i]) {
         strcat(binSeq, hex_to_bin(hexSeq[i]));
@@ -152,7 +151,7 @@ void packet_destroy(t_packet* self) {
 }
 
 t_packet* packet_create(uint8_t ver, uint8_t tid, char* val, char ltid) {
-    t_packet* self = malloc(sizeof(t_packet));
+    t_packet* self = malloc(sizeof(*self));
     self->ver = ver;
     self->tid = tid;
     self->val = val;
@@ -205,8 +204,8 @@ char* currify(char* LVal, uint8_t operator, char* RVal) {
 }
 
 t_packet* decode_packet(char* binSeq, size_t* offset, uint64_t* versionSum) {
-    char* versionStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
-    char* typeIDStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(char));
+    char* versionStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(*versionStr));
+    char* typeIDStr = calloc(HEADER_COMPONENT_SIZE + 1, sizeof(*typeIDStr));
     versionStr[HEADER_COMPONENT_SIZE] = '\0';
     typeIDStr[HEADER_COMPONENT_SIZE] = '\0';
 
@@ -224,7 +223,7 @@ t_packet* decode_packet(char* binSeq, size_t* offset, uint64_t* versionSum) {
 
     if(is_literal(typeID)) {
         uint64_t valueInBinSize = LITERAL_GROUP_SIZE + 1;
-        char* valueInBin = calloc(valueInBinSize, sizeof(char));
+        char* valueInBin = calloc(valueInBinSize, sizeof(*valueInBin));
         bool literalsEnd = false;
         while(!literalsEnd) {
             char prefix = binSeq[*offset];
@@ -251,14 +250,14 @@ t_packet* decode_packet(char* binSeq, size_t* offset, uint64_t* versionSum) {
         } else if(is_number_of_subpackets_ltid(ltid)) {
             binSize = SUBPACKETS_NUMBER_SIZE + 1;
         }
-        char* binAux = calloc(binSize, sizeof(char));
+        char* binAux = calloc(binSize, sizeof(*binAux));
         memcpy(binAux, binSeq + *offset, binSize - 1);
         binAux[binSize - 1] = '\0';
         *offset += binSize - 1;
         value = bin_to_dec(binAux);
         free(binAux);
     }
-    char* val = calloc(number_of_digits(value) + 1, sizeof(char));
+    char* val = calloc(number_of_digits(value) + 1, sizeof(*val));
     sprintf(val, "%ld", value);
 
     free(versionStr);
@@ -282,19 +281,22 @@ void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t 
             *processedLength += childProcessedLength;
             processedSubPackets += childProcessedSubPackets;
         }
-        parent->subPackets = realloc(parent->subPackets, ++(parent->subPacketsSize) * sizeof(t_packet*));
+        parent->subPacketsSize += 1;
+        parent->subPackets = realloc(parent->subPackets, parent->subPacketsSize * sizeof(**(parent->subPackets)));
         (parent->subPackets)[parent->subPacketsSize - 1] = child;
     }
 }
 
 void push(char*** stack, uint32_t* stackSize, char* elem) {
-    *stack = realloc(*stack, ++(*stackSize) * sizeof(char*));
+    *stackSize += 1;
+    *stack = realloc(*stack, *stackSize * sizeof(**stack));
     (*stack)[*stackSize - 1] = strdup(elem);
 }
 
 char* pop(char*** stack, uint32_t* stackSize) {
     char* elem = (*stack)[*stackSize - 1];
-    *stack = realloc(*stack, --(*stackSize) * sizeof(char*));
+    *stackSize -= 1;
+    *stack = realloc(*stack, *stackSize * sizeof(**stack));
     if(*stackSize == 0) {
         *stack = NULL;
     }
