@@ -22,7 +22,7 @@ void _(void) {
         " ⠘⢷⣄⣀⣀⣀⣀⣀⣀⠀⠀⠀⠀⠀⠀⠀⣀⡀⡀⢀⣿",
         " ⠀⠀⠀⠀⠉⠉⠉⠉⠙⠛⠛⠛⠛⠛⠛⠛⠋⠉⠉⠉⠁"
     };
-    for(int i = 0; i < 14; i++) {
+    for(int i = 0; i < 14; i += 1) {
         printf("%s\n", _[i]);
     }
 }
@@ -37,14 +37,14 @@ void _(void) {
 #define SUBPACKETS_TOTAL_LENGTH_SIZE 15
 
 typedef enum {
-    SUM,
-    PRODUCT,
-    MINIMUM,
-    MAXIMUM,
-    LITERAL,
-    GREATER_THAN,
-    LESS_THAN,
-    EQUAL_TO
+    PACKET_TYPE_sum,
+    PACKET_TYPE_product,
+    PACKET_TYPE_minimum,
+    PACKET_TYPE_maximum,
+    PACKET_TYPE_literal,
+    PACKET_TYPE_greater_than,
+    PACKET_TYPE_less_than,
+    PACKET_TYPE_equal_to
 } t_packet_type;
 
 typedef struct t_packet t_packet;
@@ -58,14 +58,14 @@ struct t_packet {
     t_packet** subPackets;
 };
 
-bool is_sum(t_packet_type tid) { return tid == SUM; }
-bool is_prod(t_packet_type tid) { return tid == PRODUCT; }
-bool is_min(t_packet_type tid) { return tid == MINIMUM; }
-bool is_max(t_packet_type tid) { return tid == MAXIMUM; }
-bool is_literal(t_packet_type tid) { return tid == LITERAL; }
-bool is_greater(t_packet_type tid) { return tid == GREATER_THAN; }
-bool is_less(t_packet_type tid) { return tid == LESS_THAN; }
-bool is_equal(t_packet_type tid) { return tid == EQUAL_TO; }
+bool is_sum(t_packet_type tid) { return tid == PACKET_TYPE_sum; }
+bool is_prod(t_packet_type tid) { return tid == PACKET_TYPE_product; }
+bool is_min(t_packet_type tid) { return tid == PACKET_TYPE_minimum; }
+bool is_max(t_packet_type tid) { return tid == PACKET_TYPE_maximum; }
+bool is_literal(t_packet_type tid) { return tid == PACKET_TYPE_literal; }
+bool is_greater(t_packet_type tid) { return tid == PACKET_TYPE_greater_than; }
+bool is_less(t_packet_type tid) { return tid == PACKET_TYPE_less_than; }
+bool is_equal(t_packet_type tid) { return tid == PACKET_TYPE_equal_to; }
 bool is_operator(t_packet_type tid) {
     return is_sum(tid) || is_prod(tid) || is_min(tid) || is_max(tid) || is_greater(tid) || is_less(tid) || is_equal(tid);
 }
@@ -109,17 +109,19 @@ const char* hex_to_bin(char hex) {
 
 uint64_t bin_to_dec(char* bin /* must be null terminated */) {
     uint64_t dec = 0;
-    size_t i = 0;
-    while(bin[i]) {
-        if(bin[i] == '1') dec = dec * 2 + 1;
-        else if(bin[i] == '0') dec *= 2;
-        i++;
+    for(size_t i = 0; bin[i]; i += 1) {
+        if(bin[i] == '1') {
+            dec = dec * 2 + 1;
+        } else if(bin[i] == '0') {
+            dec *= 2;
+        }
     }
     return dec;
 }
 
 char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
-    char* hex = calloc(++(*hexSeqSize), sizeof(*hex));
+    *hexSeqSize += 1;
+    char* hex = calloc(*hexSeqSize, sizeof(*hex));
     char c = fgetc(input);
     while(c != EOF && c != '\n') {
         hex[*hexSeqSize - 1] = c;
@@ -134,10 +136,8 @@ char* get_hexSeq(FILE* input, size_t* hexSeqSize) {
 
 char* hexSeq_to_binSeq(char* hexSeq, size_t binSeqSize) {
     char* binSeq = calloc(binSeqSize, sizeof(*binSeq));
-    size_t i = 0;
-    while(hexSeq[i]) {
+    for(size_t i = 0; hexSeq[i]; i += 1) {
         strcat(binSeq, hex_to_bin(hexSeq[i]));
-        i++;
     }
     binSeq[binSeqSize - 1] = '\0';
     return binSeq;
@@ -273,7 +273,7 @@ void decode_subpackets(t_packet* parent, char* binSeq, size_t* offset, uint64_t 
         size_t finalOffset = *offset;
         size_t diffOffset = finalOffset - initialOffset;
         *processedLength += diffOffset;
-        processedSubPackets++;
+        processedSubPackets += 1;
         if(!is_literal(child->tid)) {
             uint64_t childProcessedLength = 0;
             uint64_t childProcessedSubPackets = 0;
@@ -304,7 +304,7 @@ char* pop(char*** stack, uint32_t* stackSize) {
 }
 
 void ast_print(t_packet* packet, uint32_t depth) {
-    for(size_t i = 0; i < depth; i++) {
+    for(size_t i = 0; i < depth; i += 1) {
         printf("  ");
     }
     printf(
@@ -316,27 +316,27 @@ void ast_print(t_packet* packet, uint32_t depth) {
         packet->subPacketsSize,
         packet->currified
     );
-    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+    for(size_t i = 0; i < packet->subPacketsSize; i += 1) {
         ast_print(packet->subPackets[i], depth + 1);
     }
 }
 
 void ast_destroy(t_packet* packet) {
-    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+    for(size_t i = 0; i < packet->subPacketsSize; i += 1) {
         ast_destroy(packet->subPackets[i]);
     }
     packet_destroy(packet);
 }
 
 void ast_eval(t_packet* packet) {
-    for(size_t i = 0; i < packet->subPacketsSize; i++) {
+    for(size_t i = 0; i < packet->subPacketsSize; i += 1) {
         if(!is_literal(packet->subPackets[i]->tid)) {
             ast_eval(packet->subPackets[i]);
         }
     }
     uint32_t stackSize = 0;
     char** stack = NULL;
-    for(size_t i = packet->subPacketsSize; i > 0; i--) {
+    for(size_t i = packet->subPacketsSize; i > 0; i -= 1) {
         push(&stack, &stackSize, packet->subPackets[i - 1]->currified);
     }
     while(stackSize > 1) {
@@ -362,19 +362,16 @@ uint64_t solution(FILE* input) {
     uint64_t versionSum = 0;
     size_t offset = 0;
     t_packet* outer = decode_packet(binSeq, &offset, &versionSum);
-    uint64_t processedSubPackets = 0;
-    uint64_t processedLength = 0;
-    decode_subpackets(outer, binSeq, &offset, processedSubPackets, &processedLength, &versionSum);
+    decode_subpackets(outer, binSeq, &offset, (uint64_t) {0}, &(uint64_t) {0}, &versionSum);
 
-    uint32_t depth = 0;
     printf("Before eval:\n");
-    ast_print(outer, depth);
+    ast_print(outer, (uint64_t) {0});
     printf("\n==================================================================================================\n\n");
 
     ast_eval(outer);
 
     printf("After eval:\n");
-    ast_print(outer, depth);
+    ast_print(outer, (uint64_t) {0});
     printf("\n");
 
     uint64_t eval = atoll(outer->currified);
