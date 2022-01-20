@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <math.h>
 #include <string.h>
 #include <gmp.h>
 
@@ -87,9 +86,6 @@ bool all_subpackets_decoded(t_packet* parent, uint64_t processedSubPackets, uint
 }
 
 uint64_t number_of_digits(uint64_t x) { return snprintf(0, 0, "%+ld", x) - 1; }
-
-uint64_t min(uint64_t a, uint64_t b) { return a < b ? a : b; }
-uint64_t max(uint64_t a, uint64_t b) { return a > b ? a : b; }
 
 char* hex_to_bin(char hex) {
     switch(hex) {
