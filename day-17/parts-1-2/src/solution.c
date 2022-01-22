@@ -29,7 +29,7 @@ t_vector2* vector2_create(int64_t x, int64_t y) {
 t_target target_create(FILE* const input) {
     int64_t xf, xi, yf, yi;
     fscanf(input, "target area: x=%ld..%ld, y=%ld..%ld", &xi, &xf, &yi, &yf);
-    return (t_target const) {
+    return (t_target) {
         .finalPos.x = xf,
         .finalPos.y = yf,
         .initialPos.x = xi,
