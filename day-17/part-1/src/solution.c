@@ -96,26 +96,28 @@ void trajectory_print(t_trajectory* t) {
 
 t_trajectory* trajectory_create(t_vector2 currVel, t_target target) {
     t_vector2 currPos = {.x = 0, .y = 0};
+    t_vector2 auxVel  = currVel;
 
     t_vector2** trajectory = NULL;
     size_t trajectorySize = 0;
 
-    currPos = trajectory_travel(currPos, &currVel);
+    currPos = trajectory_travel(currPos, &auxVel);
     while (is_within_limits(target, currPos)) {
         trajectorySize += 1;
         trajectory = realloc(trajectory, trajectorySize * sizeof(*trajectory));
         trajectory[trajectorySize - 1] = vector2_create(currPos.x, currPos.y);
-        currPos = trajectory_travel(currPos, &currVel);
+        currPos = trajectory_travel(currPos, &auxVel);
     }
 
     t_trajectory* self = malloc(sizeof(*self));
     self->trajectory = trajectory;
     self->trajectorySize = trajectorySize;
+    self->vi = currVel;
 
     return self;
 }
 
-int64_t maximum_height(t_trajectory* t) {
+int64_t trajectory_max_height(t_trajectory* t) {
     int64_t max = t->trajectory[0]->y;
     for (size_t i = 1; i < t->trajectorySize; i += 1) {
         if (t->trajectory[i]->y > max) {
@@ -143,41 +145,39 @@ bool trajectory_target_hit(t_target target, t_trajectory* t) {
     return false;
 }
 
-t_vector2 yMax_velocity(t_target const target, t_vector2 * const initVels, size_t const velSize) {
-    t_vector2* currYMaxVel = NULL;
+t_trajectory* yMax_trajectory(t_target const target, t_vector2 const * const initVels, size_t const velSize) {
+    t_trajectory* yMaxTrajectory = NULL;
     for (size_t i = 0; i < velSize; i += 1) {
-        t_trajectory* currYMaxVelTrajectory = NULL;
-        if (currYMaxVel == NULL) {
-            currYMaxVelTrajectory = trajectory_create(initVels[i], target);
-            if(trajectory_target_hit(target, currYMaxVelTrajectory)) {
-                currYMaxVel = &initVels[i];
+        t_trajectory* trajectory = trajectory_create(initVels[i], target);
+        if(trajectory_target_hit(target, trajectory)) {
+            if (yMaxTrajectory != NULL) {
+                if (trajectory_max_height(trajectory) > trajectory_max_height(yMaxTrajectory)) {
+                    trajectory_destroy(yMaxTrajectory);
+                    yMaxTrajectory = trajectory;
+                } else {
+                    trajectory_destroy(trajectory);
+                }
+            } else {
+                yMaxTrajectory = trajectory;
             }
         } else {
-            currYMaxVelTrajectory  = trajectory_create(*currYMaxVel, target);
-            t_trajectory* yMaxVelT = trajectory_create(initVels[i], target);
-            if(trajectory_target_hit(target, yMaxVelT)) {
-                int64_t currYMaxVelTMax = maximum_height(currYMaxVelTrajectory);
-                int64_t yMaxVelTMax     = maximum_height(yMaxVelT);
-                if (yMaxVelTMax > currYMaxVelTMax) {
-                    currYMaxVel = &initVels[i];
-                }
-            }
-            trajectory_destroy(yMaxVelT);
+            trajectory_destroy(trajectory);
         }
-        trajectory_destroy(currYMaxVelTrajectory);
     }
-    return *currYMaxVel;
+    return yMaxTrajectory;
 }
 /////////////////////////////////////////////////////
 uint64_t solution(FILE* input) {
     t_target const target = target_create(input);
     size_t velSize = 0;
-    t_vector2 * const initVels = initial_velocities(target, &velSize);
+    t_vector2 const * const initVels = initial_velocities(target, &velSize);
     target_print(target);
-    t_vector2 yMaxVel = yMax_velocity(target, initVels, velSize);
-    printf("Maximum height Vi: (%ld, %ld)\n", yMaxVel.x, yMaxVel.y);
-    free((void*)initVels);
-    return 0;
+    t_trajectory* yMaxTrajectory = yMax_trajectory(target, initVels, velSize);
+    printf("Maximum height Vi: (%ld, %ld)\n", yMaxTrajectory->vi.x, yMaxTrajectory->vi.y);
+    int64_t highestPoint = trajectory_max_height(yMaxTrajectory);
+    trajectory_destroy(yMaxTrajectory);
+    free((void*) initVels);
+    return highestPoint;
 }
 
 int main(int argc, char* argv[] /*ARGS="../input.txt"*/) {
