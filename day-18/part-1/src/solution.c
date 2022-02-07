@@ -282,15 +282,61 @@ char* snailfish_numbers_sum(char** sfn, size_t sfnSize) {
     return left;
 }
 
+uint64_t pair_magnitude(uint64_t left, uint64_t right) {
+    return 3 * left + 2 * right;
+}
+
+uint64_t snailfish_number_magnitude(char const * const sfn) {
+    char* number = strdup(sfn);
+    int32_t openBracketIndex = -1;
+    for (int32_t i = 0; number[i] != '\0'; i += 1) {
+        if (number[i] == '[') {
+            openBracketIndex = i;
+        } else if (number[i] == ']') {
+            uint64_t left = strtoull(number + openBracketIndex + 1, NULL, BASE10);
+            uint64_t right = strtoull(number + openBracketIndex + 1 + number_of_digits(left) + 1, NULL, BASE10);
+            uint64_t pairMagnitude = pair_magnitude(left, right);
+
+            size_t prevPairSize = 1 + number_of_digits(left) + 1 + number_of_digits(right) + 1;
+            size_t pairMagnitudeSize = number_of_digits(pairMagnitude);
+            size_t newNumberSize = strlen(number) + 1 - prevPairSize + pairMagnitudeSize;
+
+            char* newNumber = calloc(newNumberSize, sizeof(*newNumber));
+
+            size_t currNew = 0;
+            size_t curr = 0;
+
+            memcpy(newNumber, number, openBracketIndex);
+            currNew += openBracketIndex;
+            curr += openBracketIndex;
+
+            sprintf(newNumber + currNew, "%ld", pairMagnitude);
+            currNew += pairMagnitudeSize;
+            curr += prevPairSize;
+
+            memcpy(newNumber + currNew, number + curr, strlen(number) - curr);
+
+            free(number);
+            number = newNumber;
+
+            i = -1;
+            openBracketIndex = -1;
+        }
+    }
+    uint64_t m = atoll(number);
+    free(number);
+    return m;
+}
+
 uint64_t solution(FILE* const input) {
     size_t sfnSize = 0;
     char** sfnStrArr = snailfish_numbers_extract(input, &sfnSize);
     char* finalSum = snailfish_numbers_sum(sfnStrArr, sfnSize);
     printf("Final sum: %s\n", finalSum);
-    // TODO: Calculate magnitude
+    uint64_t m = snailfish_number_magnitude(finalSum);
     matrix_destroy((void**) sfnStrArr, sfnSize);
     free(finalSum);
-    return 0;
+    return m;
 }
 
 int main(int argc, char* argv[] /*ARGS="../input.txt"*/) {
