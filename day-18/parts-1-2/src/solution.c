@@ -10,11 +10,24 @@
 #define SPLIT_MIN 10
 #define EXPLODE_MIN 5
 #define NULL_CHAR '\0'
+#define PAIR_SIZE 2
+#define LEFT 0
+#define RIGHT 1
 
 typedef enum {
     EXPLODE,
     SPLIT
 } t_search;
+
+typedef struct {
+    uint32_t values[PAIR_SIZE];
+    uint32_t sizes[PAIR_SIZE];
+    uint32_t newLens[PAIR_SIZE];
+    uint32_t newNumberLen;
+    int32_t firstIndexes[PAIR_SIZE];
+    int32_t firsts[PAIR_SIZE];
+    int32_t news[PAIR_SIZE];
+} t_explode;
 
 void matrix_destroy(void** matrix, size_t dim) {
     for(size_t i = 0; i < dim; i++) {
@@ -56,8 +69,8 @@ char** extract_lines(FILE* const input, size_t* const size) {
         lines[curr][n - 1] = NULL_CHAR;
         curr += 1;
     }
-    getline(&lines[curr], &n, input);       // stores allocated size in n (last ']' included without null char)
-    n += 1;                                 // including null char
+    getline(&lines[curr], &n, input);       // store allocated size in n (last ']' included without null char)
+    n += 1;                                 // include null char
     lines[curr] = realloc(lines[curr], n);  // realloc to store allocated size with null char
     lines[curr][n - 1] = NULL_CHAR;         // set last to null char
     return lines;
@@ -100,51 +113,59 @@ int32_t first_occurrence_index(size_t initial, char direction, char* number) {
     return curr;
 }
 
-char* snailfish_number_explode(size_t initial, char * const number) {
+t_explode explotion_create(size_t const initial, char * const number) {
     uint32_t left = strtoul(number + initial + 1, NULL, BASE10);
     uint32_t right = strtoul(number + initial + 1 + number_of_digits(left) + 1, NULL, BASE10);
+    uint32_t values[PAIR_SIZE] = {left, right};
+    uint32_t sizes[PAIR_SIZE] = {
+        number_of_digits(left),
+        number_of_digits(right)
+    };
+    int32_t firstIndexes[PAIR_SIZE] = {
+        first_occurrence_index(initial, 'L', number),
+        first_occurrence_index(initial + sizes[LEFT] + 1 + sizes[RIGHT] + 1, 'R', number)
+    };
+    int32_t firsts[PAIR_SIZE] = {-1, -1};
+    int32_t news[PAIR_SIZE] = {-1, -1};
+    uint32_t newLens[PAIR_SIZE] = {0, 0};
 
-    int32_t firstLeftIndex = first_occurrence_index(initial, 'L', number);
-    size_t leftSize = number_of_digits(left);
-    size_t rightSize = number_of_digits(right);
-    int32_t firstRightIndex = first_occurrence_index(initial + leftSize + 1 + rightSize + 1, 'R', number);
+    uint32_t newNumberLen = strlen(number) + 1;
+    newNumberLen -= sizes[LEFT] + sizes[RIGHT];
 
-    int32_t firstLeft = -1;
-    int32_t newLeft = -1;
-    size_t newLeftLen = 0;
-
-    int32_t firstRight = -1;
-    int32_t newRight = -1;
-    size_t newRightLen = 0;
-
-    size_t newLen = strlen(number) + 1;
-    newLen -= leftSize + rightSize;   // "x,y]" => "0"
-
-    if (firstLeftIndex > -1) {
-        firstLeft = strtoul(number + firstLeftIndex, NULL, BASE10);
-        newLeft = firstLeft + left;
-        newLeftLen = number_of_digits(newLeft);
-        newLen += newLeftLen - leftSize;
+    for(size_t i = 0; i < PAIR_SIZE; i++) {
+        if (firstIndexes[i] > -1) {
+            firsts[i] = strtoul(number + firstIndexes[i], NULL, BASE10);
+            news[i] = firsts[i] + values[i];
+            newLens[i] = number_of_digits(news[i]);
+            newNumberLen += newLens[i] - sizes[i];
+        }
     }
-    if (firstRightIndex > -1) {
-        firstRight = strtoul(number + firstRightIndex, NULL, BASE10);
-        newRight = firstRight + right;
-        newRightLen = number_of_digits(newRight);
-        newLen += newRightLen - rightSize;
-    }
+    t_explode e;
+    memcpy(e.values, values, sizeof(values));
+    memcpy(e.sizes, sizes, sizeof(sizes));
+    memcpy(e.firstIndexes, firstIndexes, sizeof(firstIndexes));
+    memcpy(e.firsts, firsts, sizeof(firsts));
+    memcpy(e.news, news, sizeof(news));
+    memcpy(e.newLens, newLens, sizeof(newLens));
+    e.newNumberLen = newNumberLen;
+    return e;
+}
 
-    char* newNumber = calloc(newLen, sizeof(*newNumber));
+char* snailfish_number_explode(size_t initial, char * const number) {
+    t_explode e = explotion_create(initial, number);
+
+    char* newNumber = calloc(e.newNumberLen, sizeof(*newNumber));
     size_t currNew = 0;
     size_t curr = 0;
 
-    if(firstLeft > -1) {
-        memcpy(newNumber, number, firstLeftIndex);
-        currNew += firstLeftIndex;
-        curr += firstLeftIndex;
+    if(e.firsts[LEFT] > -1) {
+        memcpy(newNumber, number, e.firstIndexes[LEFT]);
+        currNew += e.firstIndexes[LEFT];
+        curr += e.firstIndexes[LEFT];
 
-        sprintf(newNumber + currNew, "%d", newLeft);
-        currNew += newLeftLen;
-        curr += number_of_digits(firstLeft);
+        sprintf(newNumber + currNew, "%d", e.news[LEFT]);
+        currNew += e.newLens[LEFT];
+        curr += number_of_digits(e.firsts[LEFT]);
     }
 
     size_t currToInitial = initial - curr;
@@ -154,17 +175,17 @@ char* snailfish_number_explode(size_t initial, char * const number) {
 
     sprintf(newNumber + currNew, "%d", 0);
     currNew += 1;
-    curr += 1 + leftSize + 1 + rightSize + 1;   // "[x,y]"
+    curr += 1 + e.sizes[LEFT] + 1 + e.sizes[RIGHT] + 1;
 
-    if (firstRight > -1) {
-        size_t currToFirstRight = firstRightIndex - curr;
+    if (e.firsts[RIGHT] > -1) {
+        size_t currToFirstRight = e.firstIndexes[RIGHT] - curr;
         memcpy(newNumber + currNew, number + curr, currToFirstRight);
         currNew += currToFirstRight;
         curr += currToFirstRight;
 
-        sprintf(newNumber + currNew, "%d", newRight);
-        currNew += newRightLen;
-        curr += number_of_digits(firstRight);
+        sprintf(newNumber + currNew, "%d", e.news[RIGHT]);
+        currNew += e.newLens[RIGHT];
+        curr += number_of_digits(e.firsts[RIGHT]);
     }
 
     memcpy(newNumber + currNew, number + curr, strlen(number) - curr);
@@ -179,27 +200,21 @@ char* snailfish_number_split(int32_t initial, char* number) {
     uint32_t newLeft = (uint32_t) floor(half);
     uint32_t newRight = (uint32_t) round(half);
 
-    size_t len = strlen(number);
+    size_t numberLen = strlen(number);
     size_t valueLen = number_of_digits(value);
     size_t pairSize = 1 + number_of_digits(newLeft) + 1 + number_of_digits(newRight) + 1;
-    size_t newSize = len + pairSize + 1 - valueLen /* => [x,y] */;
 
-    char* newNumber = calloc(newSize, sizeof(*newNumber));
-
+    char* newNumber = calloc(numberLen + pairSize + 1 - valueLen, sizeof(*newNumber));
     size_t currNew = 0;
     size_t curr = 0;
 
     memcpy(newNumber, number, initial);
-
     currNew += initial;
     curr += initial;
-
     sprintf(newNumber + currNew, "[%d,%d]", newLeft, newRight);
-
     currNew += pairSize;
     curr += valueLen;
-
-    memcpy(newNumber + currNew, number + curr, len - curr);
+    memcpy(newNumber + currNew, number + curr, numberLen - curr);
 
     return newNumber;
 }
@@ -262,16 +277,13 @@ char* snailfish_numbers_add(char* left, char* right) {
 char* snailfish_numbers_sum(char** sfn, size_t sfnSize) {
     char* left = strdup(sfn[0]);
     left = snailfish_number_reduce(left);
-    printf("Left: %s\n", left);
     for (size_t i = 1; i < sfnSize; i += 1) {
         char* right = strdup(sfn[i]);
         right = snailfish_number_reduce(right);
-        printf("Right: %s\n", right);
         char* newNumber = snailfish_numbers_add(left, right);
         free(left);
         free(right);
         newNumber = snailfish_number_reduce(newNumber);
-        printf("New Number: %s\n", newNumber);
         left = newNumber;
     }
     return left;
@@ -291,24 +303,20 @@ uint64_t snailfish_number_magnitude(char const * const sfn) {
             uint64_t left = strtoull(number + openBracketIndex + 1, NULL, BASE10);
             uint64_t right = strtoull(number + openBracketIndex + 1 + number_of_digits(left) + 1, NULL, BASE10);
             uint64_t pairMagnitude = pair_magnitude(left, right);
-
             size_t prevPairSize = 1 + number_of_digits(left) + 1 + number_of_digits(right) + 1;
             size_t pairMagnitudeSize = number_of_digits(pairMagnitude);
             size_t newNumberSize = strlen(number) + 1 - prevPairSize + pairMagnitudeSize;
 
             char* newNumber = calloc(newNumberSize, sizeof(*newNumber));
-
             size_t currNew = 0;
             size_t curr = 0;
 
             memcpy(newNumber, number, openBracketIndex);
             currNew += openBracketIndex;
             curr += openBracketIndex;
-
             sprintf(newNumber + currNew, "%ld", pairMagnitude);
             currNew += pairMagnitudeSize;
             curr += prevPairSize;
-
             memcpy(newNumber + currNew, number + curr, strlen(number) - curr);
 
             free(number);
@@ -323,15 +331,37 @@ uint64_t snailfish_number_magnitude(char const * const sfn) {
     return m;
 }
 
+uint64_t largest_magnitude(char * const * const sfnStrArr, size_t sfnSize) {
+    uint64_t largest = 0;
+    for (size_t i = 0; i < sfnSize; i += 1) {
+        char* left = sfnStrArr[i];
+        for (size_t j = 0; j < sfnSize; j += 1) {
+            if(j == i) {
+                continue;
+            }
+            char* right = sfnStrArr[j];
+            char* addition = snailfish_number_reduce(snailfish_numbers_add(left, right));
+            uint64_t m = snailfish_number_magnitude(addition);
+            if(m > largest) {
+                largest = m;
+            }
+            free(addition);
+        }
+    }
+    return largest;
+}
+
 uint64_t solution(FILE* const input) {
     size_t sfnSize = 0;
     char** sfnStrArr = snailfish_numbers_extract(input, &sfnSize);
     char* finalSum = snailfish_numbers_sum(sfnStrArr, sfnSize);
-    printf("Final sum: %s\n", finalSum);
+    printf("Final Sum: %s\n", finalSum);
     uint64_t m = snailfish_number_magnitude(finalSum);
+    printf("Final Sum Magnitude: %ld\n", m);
+    uint64_t largestM = largest_magnitude(sfnStrArr, sfnSize);
     matrix_destroy((void**) sfnStrArr, sfnSize);
     free(finalSum);
-    return m;
+    return largestM;
 }
 
 int main(int argc, char* argv[] /*ARGS="../input.txt"*/) {
