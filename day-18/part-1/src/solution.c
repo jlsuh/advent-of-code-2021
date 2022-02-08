@@ -50,12 +50,16 @@ char** extract_lines(FILE* const input, size_t* const size) {
     char** lines = calloc(*size, sizeof(*lines));
     size_t n = 0;
     size_t curr = 0;
-    while(curr < *size) {
+    while(curr < *size - 1) {
         getline(&lines[curr], &n, input);
         n = strlen(lines[curr]);
         lines[curr][n - 1] = NULL_CHAR;
         curr += 1;
     }
+    getline(&lines[curr], &n, input);       // stores allocated size in n (last ']' included without null char)
+    n += 1;                                 // including null char
+    lines[curr] = realloc(lines[curr], n);  // realloc to store allocated size with null char
+    lines[curr][n - 1] = NULL_CHAR;         // set last to null char
     return lines;
 }
 
@@ -96,7 +100,7 @@ int32_t first_occurrence_index(size_t initial, char direction, char* number) {
     return curr;
 }
 
-char* snailfish_number_explode(size_t initial, char* number) {
+char* snailfish_number_explode(size_t initial, char * const number) {
     uint32_t left = strtoul(number + initial + 1, NULL, BASE10);
     uint32_t right = strtoul(number + initial + 1 + number_of_digits(left) + 1, NULL, BASE10);
 
@@ -105,44 +109,35 @@ char* snailfish_number_explode(size_t initial, char* number) {
     size_t rightSize = number_of_digits(right);
     int32_t firstRightIndex = first_occurrence_index(initial + leftSize + 1 + rightSize + 1, 'R', number);
 
-    uint32_t firstLeft = 0;
-    uint32_t newLeft = 0;
-    size_t leftLen = 0;
+    int32_t firstLeft = -1;
+    int32_t newLeft = -1;
     size_t newLeftLen = 0;
 
-    uint32_t firstRight = 0;
-    uint32_t newRight = 0;
-    size_t rightLen = 0;
+    int32_t firstRight = -1;
+    int32_t newRight = -1;
     size_t newRightLen = 0;
 
-    bool firstLeftFound = false;
-    bool firstRightFound = false;
-
     size_t newLen = strlen(number) + 1;
-    newLen -= leftSize + 1 + rightSize + 1;   // "x,y]" => "0"
+    newLen -= leftSize + rightSize;   // "x,y]" => "0"
 
     if (firstLeftIndex > -1) {
         firstLeft = strtoul(number + firstLeftIndex, NULL, BASE10);
         newLeft = firstLeft + left;
-        leftLen = leftSize;
         newLeftLen = number_of_digits(newLeft);
-        newLen += newLeftLen - leftLen;
-        firstLeftFound = true;
+        newLen += newLeftLen - leftSize;
     }
     if (firstRightIndex > -1) {
         firstRight = strtoul(number + firstRightIndex, NULL, BASE10);
         newRight = firstRight + right;
-        rightLen = rightSize;
         newRightLen = number_of_digits(newRight);
-        newLen += newRightLen - rightLen;
-        firstRightFound = true;
+        newLen += newRightLen - rightSize;
     }
 
-    char* newNumber = calloc(newLen + 1 + 1, sizeof(*newNumber));
+    char* newNumber = calloc(newLen, sizeof(*newNumber));
     size_t currNew = 0;
     size_t curr = 0;
 
-    if(firstLeftFound) {
+    if(firstLeft > -1) {
         memcpy(newNumber, number, firstLeftIndex);
         currNew += firstLeftIndex;
         curr += firstLeftIndex;
@@ -161,7 +156,7 @@ char* snailfish_number_explode(size_t initial, char* number) {
     currNew += 1;
     curr += 1 + leftSize + 1 + rightSize + 1;   // "[x,y]"
 
-    if (firstRightFound) {
+    if (firstRight > -1) {
         size_t currToFirstRight = firstRightIndex - curr;
         memcpy(newNumber + currNew, number + curr, currToFirstRight);
         currNew += currToFirstRight;
