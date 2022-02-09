@@ -113,7 +113,7 @@ int32_t first_occurrence_index(size_t initial, char direction, char* number) {
     return curr;
 }
 
-t_explode explotion_create(size_t const initial, char * const number) {
+t_explode explode_create(size_t const initial, char * const number) {
     uint32_t left = strtoul(number + initial + 1, NULL, BASE10);
     uint32_t right = strtoul(number + initial + 1 + number_of_digits(left) + 1, NULL, BASE10);
     uint32_t values[PAIR_SIZE] = {left, right};
@@ -152,7 +152,7 @@ t_explode explotion_create(size_t const initial, char * const number) {
 }
 
 char* snailfish_number_explode(size_t initial, char * const number) {
-    t_explode e = explotion_create(initial, number);
+    t_explode e = explode_create(initial, number);
 
     char* newNumber = calloc(e.newNumberLen, sizeof(*newNumber));
     size_t currNew = 0;
